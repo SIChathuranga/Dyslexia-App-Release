@@ -1,0 +1,27 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+venv311/
+.venv/
+env/
+
+# Environment variables
+.env
+
+# Model files (large binary — track with Git LFS or add manually on Render)
+# *.pt
+
+# Temp files
+temp_*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
