@@ -1,0 +1,30 @@
+# Flask and Web
+flask>=2.3.0
+flask-cors>=4.0.0
+gunicorn>=23.0.0
+
+# Core ML dependencies
+numpy>=1.24.0,<2.0.0
+Pillow>=10.0.0
+
+# TFLite Inference — lightweight option for Render deployment (Python 3.11)
+# Using tensorflow-cpu to avoid the massive GPU package on Render
+# If tflite-runtime is available for your Python version, prefer that instead:
+#   pip install tflite-runtime
+tensorflow-cpu>=2.13.0,<2.18.0
+
+# Optional for stronger preprocessing quality.
+# Keep commented for Render free plan to reduce build time and memory usage.
+# scipy>=1.11.0
+
+# MongoDB
+pymongo>=4.6.0
+dnspython>=2.4.0
+
+# Utilities
+python-dotenv>=1.0.0
+
+# Development (optional)
+# pytest>=7.4.0
+# black>=23.0.0
+# flake8>=6.1.0
