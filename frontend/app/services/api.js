@@ -1,23 +1,8 @@
 import axios from 'axios';
-import { Platform } from 'react-native';
-import Constants from 'expo-constants';
+import { getBackendUrl } from './apiHub';
 
 const resolveBaseUrl = () => {
-    // Uses the same env variable as apiHub.js — set in .env file
-    const envBaseUrl = process.env.EXPO_PUBLIC_PHOTO_SPELLING_API_URL;
-    if (envBaseUrl) return envBaseUrl.replace(/\/+$/, '');
-
-    const hostUri =
-        Constants.expoConfig?.hostUri ||
-        Constants.manifest2?.extra?.expoClient?.hostUri ||
-        Constants.manifest?.debuggerHost;
-
-    const host = hostUri?.split(':')?.[0];
-    if (host) return `http://${host}:8000`;
-
-    return Platform.OS === 'android'
-        ? 'http://10.0.2.2:8000'
-        : 'http://127.0.0.1:8000';
+    return getBackendUrl('photoSpelling');
 };
 
 const BASE_URL = resolveBaseUrl();
@@ -198,7 +183,7 @@ export const transcribeAudio = async (audioUri, _retries = 3) => {
         const response = await api.post('/speech-to-text', formData, {
             timeout: 180000, // 180s — cold start + Whisper inference on free CPU
         });
-        return response.data; // { text: "..." }
+        return response.data;
     } catch (error) {
         if (_retries > 0 && isRetryableError(error)) {
             const delay = 2000 * (4 - _retries); // 2s, 4s, 6s
@@ -220,7 +205,7 @@ export const verifyAnswer = async (detectedLabel, spokenText, _retries = 2) => {
                 spoken_text: spokenText,
             },
         });
-        return response.data; // { correct: true/false }
+        return response.data;
     } catch (error) {
         if (_retries > 0 && isRetryableError(error)) {
             const delay = 1500 * (3 - _retries);

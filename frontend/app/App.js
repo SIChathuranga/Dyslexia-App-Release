@@ -36,14 +36,15 @@ import MainHomeScreen from './screens/MainHomeScreen';
 import WelcomeScreen from './screens/WelcomeScreen';
 import UnifiedSettingsScreen from './screens/UnifiedSettingsScreen';
 import ProgressHubScreen from './screens/ProgressHubScreen';
-import MemoryAssessmentScreen from './screens/MemoryAssessmentScreen';
-import InstructionAssessmentScreen from './screens/InstructionAssessmentScreen';
-import ActionsScreen from './screens/ActionsScreen';
+import MemoryAssessmentScreen from './members/member-4-cognitive-assessment/screens/MemoryAssessmentScreen';
+import InstructionAssessmentScreen from './members/member-4-cognitive-assessment/screens/InstructionAssessmentScreen';
+import ActionsScreen from './members/member-4-cognitive-assessment/screens/ActionsScreen';
+import ActionsProgressScreen from './members/member-4-cognitive-assessment/screens/ActionsProgressScreen';
 
 // Learning modules
-import PhotoSpellingModule from './modules/PhotoSpellingModule';
-import WritingMathModule from './modules/WritingMathModule';
-import MultiSkillModule from './modules/MultiSkillModule';
+import PhotoSpellingModule from './members/member-1-photo-based/module/PhotoSpellingModule';
+import WritingMathModule from './members/member-2-whisperwriter-math/module/WritingMathModule';
+import MultiSkillModule from './members/member-3-adaptive-learning-game/module/MultiSkillModule';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -204,6 +205,12 @@ export default function App() {
           <Stack.Screen
             name="InstructionFollow"
             component={InstructionAssessmentScreen}
+            options={{ headerShown: false }}
+          />
+
+          <Stack.Screen
+            name="ActionsProgress"
+            component={ActionsProgressScreen}
             options={{ headerShown: false }}
           />
         </Stack.Navigator>

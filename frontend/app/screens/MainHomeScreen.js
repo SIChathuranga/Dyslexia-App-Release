@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -93,16 +93,6 @@ const MODULES = [
     gradientColors: ['#EDD1B0', '#EDDD6D'],
     route: 'MultiSkillModule',
     available: true,
-  },
-  {
-    id: 'reading',
-    title: 'Reading',
-    subtitle: 'Coming soon… stay tuned!',
-    emoji: '📖',
-    badge: '🔒',
-    gradientColors: ['#D8D3D6', '#D8D3D6'],
-    route: null,
-    available: false,
   },
   {
     id: 'actions',

@@ -15,8 +15,9 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Camera, PenTool, Gamepad2, ChevronRight } from 'lucide-react-native';
+import { Camera, PenTool, Gamepad2, Brain, ChevronRight } from 'lucide-react-native';
 import BackButton from '../components/BackButton';
+import BackendStatusDot from '../components/ui/BackendStatusDot';
 import { colors, fonts } from '../theme';
 
 const ProgressHubScreen = ({ navigation }) => {
@@ -48,6 +49,15 @@ const ProgressHubScreen = ({ navigation }) => {
       icon: Gamepad2,
       iconBg: '#FEF3C7',
       action: () => navigation.navigate('MultiSkillModule', { screen: 'MultiSkillProgress' }),
+    },
+    {
+      id: 'actions',
+      title: 'Actions',
+      subtitle: 'Memory and instruction performance insights',
+      icon: Brain,
+      iconBg: '#EDE9FE',
+      backendKey: 'actions',
+      action: () => navigation.navigate('ActionsProgress'),
     },
   ];
 
@@ -86,6 +96,9 @@ const ProgressHubScreen = ({ navigation }) => {
                   <Text style={styles.cardTitle}>{card.title}</Text>
                   <Text style={styles.cardSub}>{card.subtitle}</Text>
                 </View>
+                {Boolean(card.backendKey) && (
+                  <BackendStatusDot backendKey={card.backendKey} style={styles.statusDot} />
+                )}
                 <ChevronRight size={20} color="#9CA3AF" />
               </TouchableOpacity>
             );
@@ -160,6 +173,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
     marginTop: 2,
+  },
+  statusDot: {
+    marginRight: 10,
   },
 });
 

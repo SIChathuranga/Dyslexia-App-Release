@@ -31,7 +31,7 @@ import {
   DEFAULT_ACCESSIBILITY_PREFERENCES,
   getAccessibilityPreferences,
   saveAccessibilityPreferences,
-} from '../services/accessibilityPreferences';
+} from '../services/accessibilityPreferences.js';
 
 // Helper Section wrapper
 const SettingsSection = ({ icon: Icon, iconBg, title, children }) => (
@@ -239,7 +239,7 @@ const UnifiedSettingsScreen = ({ navigation }) => {
               </View>
               <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
                 <Text style={styles.infoLabel}>Modules</Text>
-                <Text style={styles.infoValue}>3 Active</Text>
+                <Text style={styles.infoValue}>4 Active</Text>
               </View>
             </SettingsSection>
 

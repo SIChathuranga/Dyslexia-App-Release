@@ -8,7 +8,7 @@
  *
  * BACKENDS:
  * ---------
- * 1. Photo-Based Spelling Challenge Backend (Port 8000)
+ * 1. Photo-Based Spelling Challenge Backend (Port 9000)
  *    - Object detection (YOLOv8)
  *    - Speech-to-text (Whisper)
  *    - Answer verification
@@ -55,9 +55,10 @@ import Constants from 'expo-constants';
 // DEFAULT PORT CONFIGURATION
 // ============================================================================
 
-const PHOTO_SPELLING_PORT = '8000'; // FastAPI backend
+const PHOTO_SPELLING_PORT = '9000'; // FastAPI backend
 const WRITING_MATH_PORT = '5000';   // Flask backend
 const MULTI_SKILL_PORT = '5001';    // Flask backend (Multi-Skill Learning Game)
+const ACTIONS_PORT = '8000';        // Action detection backend
 
 // ============================================================================
 // HOST RESOLUTION
@@ -151,6 +152,20 @@ const API_BACKENDS = {
       users: '/users',
     },
   },
+
+  /**
+   * Actions / Cognitive Assessment Backend
+   * Handles: action detection inference for memory + instruction assessments
+   */
+  actions: {
+    name: 'Actions / Cognitive Assessment',
+    envKey: 'EXPO_PUBLIC_ACTION_DETECTION_API_URL',
+    defaultPort: ACTIONS_PORT,
+    endpoints: {
+      predict: '/predict',
+      health: '/health',
+    },
+  },
 };
 
 // ============================================================================
@@ -164,7 +179,7 @@ const API_BACKENDS = {
  * 1. Environment variable (for Render / production deployment)
  * 2. Local development URL (auto-detected host + default port)
  *
- * @param {string} backendKey - 'photoSpelling', 'writingMath', or 'multiSkill'
+ * @param {string} backendKey - 'photoSpelling', 'writingMath', 'multiSkill', or 'actions'
  * @returns {string} The base URL for the backend
  */
 const getBackendUrl = (backendKey) => {
@@ -186,12 +201,13 @@ const getBackendUrl = (backendKey) => {
 
 /**
  * Get all backend URLs as a convenient object.
- * @returns {{ photoSpelling: string, writingMath: string, multiSkill: string }}
+ * @returns {{ photoSpelling: string, writingMath: string, multiSkill: string, actions: string }}
  */
 const getAllBackendUrls = () => ({
   photoSpelling: getBackendUrl('photoSpelling'),
   writingMath: getBackendUrl('writingMath'),
   multiSkill: getBackendUrl('multiSkill'),
+  actions: getBackendUrl('actions'),
 });
 
 // ============================================================================
@@ -205,4 +221,5 @@ export {
   PHOTO_SPELLING_PORT,
   WRITING_MATH_PORT,
   MULTI_SKILL_PORT,
+  ACTIONS_PORT,
 };
