@@ -1,0 +1,16 @@
+numpy<2
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+fastapi
+uvicorn[standard]
+ultralytics
+faster-whisper
+python-multipart
+pydub
+pillow
+pymongo
+dnspython
+python-dotenv
+certifi
+gunicorn
+imageio-ffmpeg

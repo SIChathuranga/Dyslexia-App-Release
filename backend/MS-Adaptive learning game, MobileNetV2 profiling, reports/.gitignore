@@ -1,0 +1,39 @@
+# Environment
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database (local SQLite - not used in production)
+*.db
+
+# Training artifacts (not needed at runtime)
+dyslexia_game_dataset.csv
+dyslexia_lstm_model.h5
+
+# EDA / visualization artifacts (not needed at runtime)
+confusion_matrix.png
+correlation_heatmap.png
+eda_distributions.png
+feature_importance.png
+lstm_training.png

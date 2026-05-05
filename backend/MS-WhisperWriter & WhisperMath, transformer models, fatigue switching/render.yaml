@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: writing-math-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn "app:create_app()" --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 120
+    healthCheckPath: /heartbeat
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: TF_CPP_MIN_LOG_LEVEL
+        value: "1"
+      - key: PYTHON_VERSION
+        value: 3.11.11
+      - key: SECRET_KEY
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB_NAME
+        value: dyslearn
+      - key: CORS_ORIGINS
+        sync: false
+      - key: KEEPALIVE_ENABLED
+        value: "true"
+      - key: KEEPALIVE_INTERVAL_SECONDS
+        value: "600"
+      - key: KEEPALIVE_ENDPOINT_PATH
+        value: /heartbeat
