@@ -1,3 +1,4 @@
+// SpeakNowScreen — child holds the mic button and says the word aloud; audio is recorded and sent to the backend for verification
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Animated, Image, Pressable, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,9 +10,9 @@ import Mascot from '../../../components/ui/Mascot';
 import { colors, fonts } from '../../../theme';
 import { verifyVoice } from '../../../services/api';
 
-const MIN_RECORDING_MS = 1000; // minimum recording duration to get usable audio
+const MIN_RECORDING_MS = 1000; // clips shorter than this are too noisy to transcribe reliably
 
-// Low-bitrate recording options — produces small files that upload reliably on Android over HTTP
+// Low-bitrate mono audio settings — keeps file size small for reliable upload over mobile networks
 const RECORDING_OPTIONS = {
     isMeteringEnabled: true,
     android: {
@@ -36,22 +37,27 @@ const RECORDING_OPTIONS = {
     },
 };
 
+// Props:
+//   detectedObject — { label, imageUri } so we know which word to check against
+//   onComplete(isMatch, transcribedText) — called after backend responds
+//   onRetry  — navigate back to this screen to try again
+//   onHome   — exit to home / exit challenge
 const SpeakNowScreen = ({ detectedObject, onComplete, onRetry, onHome }) => {
     const [isRecording, setIsRecording] = useState(false);
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [recording, setRecording] = useState(null);
-    const [waveformBars, setWaveformBars] = useState(Array(12).fill(0.3));
-    const scaleAnim = useRef(new Animated.Value(1)).current;
-    const waveInterval = useRef(null);
-    const recordingRef = useRef(null);
-    const recordingStartTime = useRef(null);
+    const [isProcessing, setIsProcessing] = useState(false); // true while waiting for backend response
+    const [recording, setRecording] = useState(null);        // active Audio.Recording instance
+    const [waveformBars, setWaveformBars] = useState(Array(12).fill(0.3)); // animated height values for waveform display
+    const scaleAnim = useRef(new Animated.Value(1)).current;  // mic button scale animation
+    const waveInterval = useRef(null);      // interval that randomises waveform heights while recording
+    const recordingRef = useRef(null);      // ref copy of recording state so cleanup effects can access it
+    const recordingStartTime = useRef(null); // used to enforce minimum recording duration
 
-    // Keep ref in sync with state
+    // Keep ref in sync so the unmount cleanup can stop an active recording
     useEffect(() => {
         recordingRef.current = recording;
     }, [recording]);
 
-    // Cleanup active recording if component unmounts prematurely
+    // If the component unmounts while still recording, stop the recording cleanly to avoid resource leaks
     useEffect(() => {
         return () => {
             const rec = recordingRef.current;
@@ -69,36 +75,30 @@ const SpeakNowScreen = ({ detectedObject, onComplete, onRetry, onHome }) => {
 
     const { label = 'APPLE', imageUri } = detectedObject || {};
 
+    // Called when the child presses down on the mic button
     const startRecording = async () => {
-        // Prevent multiple recordings or recording while processing
-        if (isRecording || recording || isProcessing) return;
+        if (isRecording || recording || isProcessing) return; // prevent double-tap
 
         try {
-            // Force-unload any stale recording left from a previous attempt
+            // Clean up any stale recording from a previous attempt
             if (recordingRef.current) {
-                try {
-                    await recordingRef.current.stopAndUnloadAsync();
-                } catch (_) { /* already unloaded */ }
+                try { await recordingRef.current.stopAndUnloadAsync(); } catch (_) { }
                 recordingRef.current = null;
             }
 
             await Audio.requestPermissionsAsync();
 
-            // Reset audio mode first to fully release any lingering prepared recording
-            // (can happen when navigating between screens quickly)
+            // Reset audio mode to fully release any previously prepared recording session
             await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
             await new Promise(r => setTimeout(r, 100));
-            await Audio.setAudioModeAsync({
-                allowsRecordingIOS: true,
-                playsInSilentModeIOS: true,
-            });
+            await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
 
-            // Retry createAsync — the global Audio singleton may not have released yet
+            // Retry up to 3 times — the global Audio singleton may not have released yet on fast navigation
             let newRecording;
             for (let attempt = 0; attempt < 3; attempt++) {
                 try {
-                    const result = await Audio.Recording.createAsync(RECORDING_OPTIONS);
-                    newRecording = result.recording;
+                    const result = await Audio.Recording.createAsync(RECORDING_OPTIONS); //createAsync creates a new recording instance. RECORDING_OPTIONS is an object that contains the configuration for the recording, such as the audio format and quality.
+                    newRecording = result.recording; // The recording instance is stored in the newRecording variable.
                     break;
                 } catch (e) {
                     if (attempt < 2 && e.message?.includes('Only one Recording')) {
@@ -116,29 +116,26 @@ const SpeakNowScreen = ({ detectedObject, onComplete, onRetry, onHome }) => {
             setIsRecording(true);
             recordingStartTime.current = Date.now();
 
-            Animated.spring(scaleAnim, {
-                toValue: 1.15,
-                useNativeDriver: true,
-            }).start();
+            // Animate mic button to slightly larger size while recording
+            Animated.spring(scaleAnim, { toValue: 1.15, useNativeDriver: true }).start();
 
+            // Randomise waveform bar heights every 100ms for a visual "listening" effect
             waveInterval.current = setInterval(() => {
                 setWaveformBars(prev => prev.map(() => Math.random() * 0.7 + 0.3));
             }, 100);
 
         } catch (error) {
             console.error('Failed to start recording', error);
-            // Reset state so user can retry
             setRecording(null);
             setIsRecording(false);
         }
     };
 
+    // Called when the child releases the mic button
     const stopRecording = async () => {
-        Animated.spring(scaleAnim, {
-            toValue: 1,
-            useNativeDriver: true,
-        }).start();
+        Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }).start();
 
+        // Stop waveform animation
         if (waveInterval.current) {
             clearInterval(waveInterval.current);
             waveInterval.current = null;
@@ -147,11 +144,10 @@ const SpeakNowScreen = ({ detectedObject, onComplete, onRetry, onHome }) => {
 
         if (!recording) return;
 
-        // Enforce minimum recording duration — too-short clips produce garbage
+        // Pad short recordings so the backend has enough audio to transcribe
         const elapsed = Date.now() - (recordingStartTime.current || 0);
         if (elapsed < MIN_RECORDING_MS) {
-            const remaining = MIN_RECORDING_MS - elapsed;
-            await new Promise((r) => setTimeout(r, remaining));
+            await new Promise((r) => setTimeout(r, MIN_RECORDING_MS - elapsed));
         }
 
         const currentRecording = recording;
@@ -160,17 +156,16 @@ const SpeakNowScreen = ({ detectedObject, onComplete, onRetry, onHome }) => {
         setIsProcessing(true);
 
         try {
-            // Check status before stopping — only unload if still active
             const status = await currentRecording.getStatusAsync();
             if (status.isRecording || status.canRecord) {
                 await currentRecording.stopAndUnloadAsync();
             }
 
-            // Reset audio mode so the next recording can be created cleanly
+            // Release audio mode so a future recording can start cleanly
             await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
 
-            const uri = currentRecording.getURI();
-
+            //getURI() is a method that returns the URI of the recording.
+            const uri = currentRecording.getURI(); //
             if (!uri) {
                 console.error('Recording URI is null — audio was not captured');
                 setIsProcessing(false);
@@ -178,7 +173,7 @@ const SpeakNowScreen = ({ detectedObject, onComplete, onRetry, onHome }) => {
                 return;
             }
 
-            // Verify the audio file exists and has reasonable size before uploading
+            // Sanity-check the file exists and is large enough to be real audio
             try {
                 const fileInfo = await FileSystem.getInfoAsync(uri);
                 if (!fileInfo.exists || (fileInfo.size != null && fileInfo.size < 500)) {
@@ -191,6 +186,7 @@ const SpeakNowScreen = ({ detectedObject, onComplete, onRetry, onHome }) => {
                 console.warn('File check failed (proceeding anyway):', fsErr.message);
             }
 
+            // Send audio + expected word to the backend; result has isMatch and transcribedText
             try {
                 const result = await verifyVoice(uri, label);
                 setIsProcessing(false);
@@ -202,11 +198,7 @@ const SpeakNowScreen = ({ detectedObject, onComplete, onRetry, onHome }) => {
             }
         } catch (error) {
             console.error('Failed to stop recording', error);
-            try {
-                await currentRecording.stopAndUnloadAsync();
-            } catch (innerError) {
-                // Already unloaded — safe to ignore
-            }
+            try { await currentRecording.stopAndUnloadAsync(); } catch (innerError) { }
             await Audio.setAudioModeAsync({ allowsRecordingIOS: false }).catch(() => {});
             setIsProcessing(false);
             onComplete(false, '');
@@ -221,12 +213,12 @@ const SpeakNowScreen = ({ detectedObject, onComplete, onRetry, onHome }) => {
             style={styles.container}
         >
             <SafeAreaView style={styles.safeArea}>
-                {/* Home Button */}
+                {/* Home button — absolute top-left */}
                 <TouchableOpacity style={styles.homeButton} onPress={onHome}>
                     <Home size={24} color="#581C87" />
                 </TouchableOpacity>
 
-                {/* Object Reference */}
+                {/* Reference card — shows the photo + word so the child knows what to say */}
                 <View style={styles.referenceCard}>
                     <View style={styles.referenceContent}>
                         {imageUri && (
@@ -239,24 +231,23 @@ const SpeakNowScreen = ({ detectedObject, onComplete, onRetry, onHome }) => {
                     </View>
                 </View>
 
-                {/* Center Content */}
+                {/* Center content: mascot + hold-to-record mic button + waveform */}
                 <View style={styles.centerContent}>
                     <Mascot mood={isRecording ? "excited" : "encouraging"} size="medium" />
 
+                    {/* Status text changes based on state */}
                     <Text style={[styles.instructionText, { fontFamily: fonts.bold }]}>
                         {isProcessing ? "Processing..." : isRecording ? "Listening..." : "Hold to Speak"}
                     </Text>
 
+                    {/* Press-and-hold mic button — red while recording, grey while processing */}
                     <Pressable
                         onPressIn={startRecording}
                         onPressOut={stopRecording}
                         disabled={isProcessing}
                         style={styles.micPressable}
                     >
-                        <Animated.View style={[
-                            styles.micContainer,
-                            { transform: [{ scale: scaleAnim }] }
-                        ]}>
+                        <Animated.View style={[styles.micContainer, { transform: [{ scale: scaleAnim }] }]}>
                             <LinearGradient
                                 colors={isProcessing ? ['#9CA3AF', '#6B7280'] : isRecording ? ['#EF4444', '#DC2626'] : ['#F87171', '#EC4899']}
                                 style={styles.micButton}
@@ -270,6 +261,7 @@ const SpeakNowScreen = ({ detectedObject, onComplete, onRetry, onHome }) => {
                         </Animated.View>
                     </Pressable>
 
+                    {/* Waveform: bars animate while recording, flat when idle */}
                     <View style={styles.waveformContainer}>
                         {waveformBars.map((height, index) => (
                             <View
@@ -285,6 +277,7 @@ const SpeakNowScreen = ({ detectedObject, onComplete, onRetry, onHome }) => {
                         ))}
                     </View>
 
+                    {/* Status indicator below the waveform */}
                     {isRecording && (
                         <View style={styles.recordingIndicator}>
                             <View style={styles.recordingDot} />
@@ -299,7 +292,7 @@ const SpeakNowScreen = ({ detectedObject, onComplete, onRetry, onHome }) => {
                     )}
                 </View>
 
-                {/* Bottom Hint */}
+                {/* Bottom hint — reminds the child what word to say */}
                 <View style={styles.hintCard}>
                     <Text style={[styles.hintText, { fontFamily: fonts.regular }]}>
                         Hold the button and say:

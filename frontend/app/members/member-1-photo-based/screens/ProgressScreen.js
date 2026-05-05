@@ -1,3 +1,4 @@
+// ProgressScreen — shows the child's spelling history and stats; has a Child view and a Parent view
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,11 +11,15 @@ import { colors, fonts } from '../../../theme';
 import { getProgressStats } from '../services/progressStorage';
 import BackButton from '../../../components/BackButton';
 
+// Props:
+//   initialViewMode — 'child' (fun stats) or 'parent' (detailed dashboard)
+//   childName       — displayed in greeting and parent header
 const ProgressScreen = ({ onBack, initialViewMode = 'child', childName = 'Learner' }) => {
     const [viewMode, setViewMode] = useState(initialViewMode === 'parent' ? 'parent' : 'child');
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState(null);
 
+    // Load stats from local device storage (AsyncStorage via progressStorage service)
     const loadStats = useCallback(async () => {
         setLoading(true);
         try {
@@ -31,6 +36,7 @@ const ProgressScreen = ({ onBack, initialViewMode = 'child', childName = 'Learne
         loadStats();
     }, [loadStats]);
 
+    // Read the child's progress summary aloud when they tap the speaker button
     const handleHearProgressMessage = () => {
         if (stats && !stats.isEmpty) {
             Speech.speak(
@@ -42,6 +48,7 @@ const ProgressScreen = ({ onBack, initialViewMode = 'child', childName = 'Learne
         }
     };
 
+    // Show spinner while stats are loading from storage
     if (loading) {
         return (
             <LinearGradient
@@ -60,7 +67,7 @@ const ProgressScreen = ({ onBack, initialViewMode = 'child', childName = 'Learne
 
     const isEmpty = !stats || stats.isEmpty;
 
-    // Compute display values
+    // Pull values from stats with safe defaults
     const wordsLearned = stats?.wordsLearned || 0;
     const wordsTotal = Math.max(stats?.wordsTotal || 1, 1);
     const spellingAccuracy = stats?.spellingAccuracy || 0;
@@ -68,7 +75,7 @@ const ProgressScreen = ({ onBack, initialViewMode = 'child', childName = 'Learne
     const weeklyStarsMax = Math.max(stats?.weeklyStarsMax || 1, 1);
     const totalAttempts = stats?.totalAttempts || 0;
     const correctAttempts = stats?.correctAttempts || 0;
-    const weeklyProgress = stats?.weeklyProgress || [];
+    const weeklyProgress = stats?.weeklyProgress || []; // array of { day, accuracy, attempts }
 
     return (
         <LinearGradient
@@ -79,7 +86,8 @@ const ProgressScreen = ({ onBack, initialViewMode = 'child', childName = 'Learne
         >
             <SafeAreaView style={styles.safeArea}>
                 <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-                    {/* Header with View Toggle */}
+
+                    {/* Header with Child / Parent toggle */}
                     <View style={styles.header}>
                         <View style={styles.headerTop}>
                             <BackButton onPress={onBack} />
@@ -87,34 +95,21 @@ const ProgressScreen = ({ onBack, initialViewMode = 'child', childName = 'Learne
                             <View style={{ width: 40 }} />
                         </View>
 
+                        {/* Toggle switches between child-friendly view and detailed parent dashboard */}
                         <View style={styles.toggleContainer}>
                             <TouchableOpacity
                                 onPress={() => setViewMode('child')}
-                                style={[
-                                    styles.toggleButton,
-                                    viewMode === 'child' && styles.toggleButtonActive,
-                                ]}
+                                style={[styles.toggleButton, viewMode === 'child' && styles.toggleButtonActive]}
                             >
-                                <Text style={[
-                                    styles.toggleText,
-                                    { fontFamily: fonts.bold },
-                                    viewMode === 'child' && styles.toggleTextActive,
-                                ]}>
+                                <Text style={[styles.toggleText, { fontFamily: fonts.bold }, viewMode === 'child' && styles.toggleTextActive]}>
                                     Child View
                                 </Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 onPress={() => setViewMode('parent')}
-                                style={[
-                                    styles.toggleButton,
-                                    viewMode === 'parent' && styles.toggleButtonActiveBlue,
-                                ]}
+                                style={[styles.toggleButton, viewMode === 'parent' && styles.toggleButtonActiveBlue]}
                             >
-                                <Text style={[
-                                    styles.toggleText,
-                                    { fontFamily: fonts.bold },
-                                    viewMode === 'parent' && styles.toggleTextActive,
-                                ]}>
+                                <Text style={[styles.toggleText, { fontFamily: fonts.bold }, viewMode === 'parent' && styles.toggleTextActive]}>
                                     Parent View
                                 </Text>
                             </TouchableOpacity>
@@ -122,9 +117,9 @@ const ProgressScreen = ({ onBack, initialViewMode = 'child', childName = 'Learne
                     </View>
 
                     {viewMode === 'child' ? (
-                        /* Child View */
+                        /* ── Child View ──────────────────────────────────────────── */
                         <>
-                            {/* Profile Section */}
+                            {/* Profile card with greeting */}
                             <View style={styles.profileCard}>
                                 <View style={styles.profileRow}>
                                     <View style={styles.avatar}>
@@ -133,18 +128,14 @@ const ProgressScreen = ({ onBack, initialViewMode = 'child', childName = 'Learne
                                     <Mascot mood="happy" size="small" />
                                 </View>
                                 <Text style={[styles.greeting, { fontFamily: fonts.bold }]}>
-                                    {isEmpty
-                                        ? `Welcome, ${childName}! 🎯`
-                                        : `Great work today, ${childName}! ⭐`}
+                                    {isEmpty ? `Welcome, ${childName}! 🎯` : `Great work today, ${childName}! ⭐`}
                                 </Text>
                                 <Text style={[styles.greetingSubtitle, { fontFamily: fonts.regular }]}>
-                                    {isEmpty
-                                        ? 'Start learning by taking a photo!'
-                                        : "Here's how you're improving"}
+                                    {isEmpty ? 'Start learning by taking a photo!' : "Here's how you're improving"}
                                 </Text>
                             </View>
 
-                            {/* Mascot Speech Bubble */}
+                            {/* Mascot speech bubble with "Tap to hear" button */}
                             <View style={styles.speechBubble}>
                                 <View style={styles.bubbleArrow} />
                                 <View style={styles.bubbleContent}>
@@ -164,19 +155,17 @@ const ProgressScreen = ({ onBack, initialViewMode = 'child', childName = 'Learne
                             </View>
 
                             {isEmpty ? (
-                                /* Empty State */
+                                /* No data yet — prompt child to start */
                                 <View style={styles.emptyCard}>
                                     <Text style={[styles.emptyEmoji]}>📷</Text>
-                                    <Text style={[styles.emptyTitle, { fontFamily: fonts.bold }]}>
-                                        No progress yet
-                                    </Text>
+                                    <Text style={[styles.emptyTitle, { fontFamily: fonts.bold }]}>No progress yet</Text>
                                     <Text style={[styles.emptySubtitle, { fontFamily: fonts.regular }]}>
                                         Take a photo of an object and try saying its name to start tracking your progress!
                                     </Text>
                                 </View>
                             ) : (
                                 <>
-                                    {/* Progress Cards */}
+                                    {/* Two circular progress rings: Words Learned and Weekly Stars */}
                                     <View style={styles.progressRow}>
                                         <View style={styles.progressCard}>
                                             <ProgressRing
@@ -203,7 +192,7 @@ const ProgressScreen = ({ onBack, initialViewMode = 'child', childName = 'Learne
                                         </View>
                                     </View>
 
-                                    {/* Spelling Accuracy */}
+                                    {/* Spelling accuracy bar */}
                                     <View style={styles.accuracyCard}>
                                         <View style={styles.accuracyHeader}>
                                             <View style={styles.accuracyIcon}>
@@ -230,7 +219,7 @@ const ProgressScreen = ({ onBack, initialViewMode = 'child', childName = 'Learne
                             )}
                         </>
                     ) : (
-                        /* Parent View */
+                        /* ── Parent View ─────────────────────────────────────────── */
                         <>
                             <View style={styles.parentHeader}>
                                 <Text style={[styles.parentTitle, { fontFamily: fonts.bold }]}>
@@ -244,16 +233,14 @@ const ProgressScreen = ({ onBack, initialViewMode = 'child', childName = 'Learne
                             {isEmpty ? (
                                 <View style={styles.emptyCard}>
                                     <Text style={[styles.emptyEmoji]}>📊</Text>
-                                    <Text style={[styles.emptyTitle, { fontFamily: fonts.bold }]}>
-                                        No data yet
-                                    </Text>
+                                    <Text style={[styles.emptyTitle, { fontFamily: fonts.bold }]}>No data yet</Text>
                                     <Text style={[styles.emptySubtitle, { fontFamily: fonts.regular }]}>
                                         Your child hasn't completed any learning activities yet. Progress will appear here after they practice.
                                     </Text>
                                 </View>
                             ) : (
                                 <>
-                                    {/* Summary Stats */}
+                                    {/* Three stat tiles: total attempts, correct, accuracy % */}
                                     <View style={styles.parentStatsRow}>
                                         <View style={styles.parentStatCard}>
                                             <Text style={[styles.parentStatValue, { fontFamily: fonts.bold }]}>{totalAttempts}</Text>
@@ -269,7 +256,7 @@ const ProgressScreen = ({ onBack, initialViewMode = 'child', childName = 'Learne
                                         </View>
                                     </View>
 
-                                    {/* Weekly Accuracy Chart */}
+                                    {/* Bar chart: one row per day for the last 7 days */}
                                     {weeklyProgress.length > 0 && (
                                         <View style={styles.chartCard}>
                                             <View style={styles.chartHeader}>
@@ -290,6 +277,7 @@ const ProgressScreen = ({ onBack, initialViewMode = 'child', childName = 'Learne
                                                                 <Text style={[styles.chartPercent, { fontFamily: fonts.bold }]}>{day.accuracy}%</Text>
                                                             </LinearGradient>
                                                         ) : (
+                                                            /* No attempts that day */
                                                             <View style={styles.chartEmpty}>
                                                                 <Text style={[styles.chartEmptyText, { fontFamily: fonts.regular }]}>—</Text>
                                                             </View>
@@ -303,7 +291,6 @@ const ProgressScreen = ({ onBack, initialViewMode = 'child', childName = 'Learne
                             )}
                         </>
                     )}
-
                 </ScrollView>
             </SafeAreaView>
         </LinearGradient>
@@ -347,12 +334,8 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         alignItems: 'center',
     },
-    toggleButtonActive: {
-        backgroundColor: colors.purple,
-    },
-    toggleButtonActiveBlue: {
-        backgroundColor: colors.blue,
-    },
+    toggleButtonActive: { backgroundColor: colors.purple },
+    toggleButtonActiveBlue: { backgroundColor: colors.blue },
     toggleText: { fontSize: 14, color: '#6B7280' },
     toggleTextActive: { color: 'white' },
     profileCard: {
@@ -482,10 +465,7 @@ const styles = StyleSheet.create({
     },
     parentTitle: { fontSize: 22, color: '#1F2937', marginBottom: 4 },
     parentSubtitle: { fontSize: 14, color: '#6B7280' },
-    parentStatsRow: {
-        flexDirection: 'row',
-        marginBottom: 16,
-    },
+    parentStatsRow: { flexDirection: 'row', marginBottom: 16 },
     parentStatCard: {
         flex: 1,
         backgroundColor: 'white',
@@ -531,13 +511,8 @@ const styles = StyleSheet.create({
         paddingRight: 12,
     },
     chartPercent: { fontSize: 12, color: 'white' },
-    chartEmpty: {
-        height: '100%',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
+    chartEmpty: { height: '100%', justifyContent: 'center', alignItems: 'center' },
     chartEmptyText: { fontSize: 12, color: '#9CA3AF' },
-
 });
 
 export default ProgressScreen;

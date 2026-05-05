@@ -1,3 +1,4 @@
+// CameraScreen — child takes a photo of an object; photo is sent to the AI for object detection
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +11,12 @@ import { detectObject } from '../../../services/api';
 import * as Speech from 'expo-speech';
 import { normalizeChallengeLabel } from '../constants/challengeWords';
 
+// Props:
+//   onObjectDetected — callback with { imageUri, label, confidence } when AI finds an object
+//   onClose          — called when user exits (Back / Exit Challenge)
+//   challengeWord    — the specific word the child must find in challenge mode (null in free practice)
+//   challengeWords   — full list of today's challenge words (shown as chips)
+//   completedWords   — words already done (chips shown as green)
 const CameraScreen = ({
     onObjectDetected,
     onClose,
@@ -18,20 +25,22 @@ const CameraScreen = ({
     completedWords = [],
 }) => {
     const [permission, requestPermission] = useCameraPermissions();
-    const [captured, setCaptured] = useState(false);
-    const [imageUri, setImageUri] = useState(null);
-    const [loading, setLoading] = useState(false);
-    const [challengeMessage, setChallengeMessage] = useState(null);
+    const [captured, setCaptured] = useState(false);   // true after photo is taken
+    const [imageUri, setImageUri] = useState(null);     // local URI of the captured photo
+    const [loading, setLoading] = useState(false);      // true while waiting for AI result
+    const [challengeMessage, setChallengeMessage] = useState(null); // instruction text shown on camera
     const cameraRef = useRef(null);
     const challengeStep = challengeWords.findIndex((word) => word === challengeWord) + 1;
     const isChallengeMode = Boolean(challengeWord);
 
+    // Request camera permission on mount if not already granted
     useEffect(() => {
         if (!permission?.granted) {
             requestPermission();
         }
     }, [permission]);
 
+    // Update the on-screen instruction whenever the target word changes
     useEffect(() => {
         if (challengeWord) {
             setChallengeMessage(`Take a photo of ${challengeWord}`);
@@ -40,6 +49,7 @@ const CameraScreen = ({
         }
     }, [challengeWord]);
 
+    // Take a photo at 70% quality and store its URI locally
     const handleCapture = async () => {
         if (cameraRef.current) {
             try {
@@ -52,6 +62,7 @@ const CameraScreen = ({
         }
     };
 
+    // Send the photo to the backend AI; handle mismatch, success, and errors
     const handleConfirm = async () => {
         setLoading(true);
         try {
@@ -59,6 +70,7 @@ const CameraScreen = ({
             console.log('Detection Result:', result);
 
             if (result.label) {
+                // In challenge mode: if detected object doesn't match the required word, prompt retry
                 if (
                     challengeWord &&
                     normalizeChallengeLabel(result.label) !== normalizeChallengeLabel(challengeWord)
@@ -70,6 +82,7 @@ const CameraScreen = ({
                     return;
                 }
 
+                // Object matches — pass result up and navigate to ObjectRecognitionScreen
                 Speech.speak(`I found a ${result.label}`, { language: 'en' });
                 onObjectDetected({
                     imageUri,
@@ -93,11 +106,13 @@ const CameraScreen = ({
         }
     };
 
+    // Discard the photo so the child can try again
     const handleRetry = () => {
         setCaptured(false);
         setImageUri(null);
     };
 
+    // Show permission request screen if camera access not yet granted
     if (!permission?.granted) {
         return (
             <View style={styles.permissionContainer}>
@@ -113,7 +128,7 @@ const CameraScreen = ({
 
     return (
         <View style={styles.container}>
-            {/* Camera View */}
+            {/* Top half: live camera OR the captured photo */}
             <View style={styles.cameraContainer}>
                 {!captured ? (
                     <>
@@ -123,7 +138,7 @@ const CameraScreen = ({
                             facing="back"
                         />
 
-                        {/* Frame overlay */}
+                        {/* Dashed frame helps child centre the object */}
                         <View style={styles.frameOverlay}>
                             <View style={styles.frame}>
                                 <Text style={[styles.frameText, { fontFamily: fonts.bold }]}>
@@ -132,7 +147,7 @@ const CameraScreen = ({
                             </View>
                         </View>
 
-                        {/* Instructions */}
+                        {/* Instruction banner — orange in challenge mode, purple in free practice */}
                         <View style={styles.instructionWrapper}>
                             <LinearGradient
                                 colors={isChallengeMode ? [colors.orange, '#F59E0B'] : [colors.purple, '#9B6BC8']}
@@ -156,12 +171,14 @@ const CameraScreen = ({
                         </View>
                     </>
                 ) : (
+                    // Show the captured photo for confirmation
                     <Image source={{ uri: imageUri }} style={styles.capturedImage} />
                 )}
             </View>
 
-            {/* Controls */}
+            {/* Bottom panel: challenge word chips + capture/confirm buttons */}
             <View style={styles.controls}>
+                {/* Challenge word chips — yellow = current, green = done, grey = locked */}
                 {isChallengeMode && (
                     <View style={styles.challengePanel}>
                         <Text style={[styles.challengePanelTitle, { fontFamily: fonts.bold }]}>
@@ -197,6 +214,7 @@ const CameraScreen = ({
                     </View>
                 )}
 
+                {/* Before capture: big camera button + back link */}
                 {!captured ? (
                     <View style={styles.captureControls}>
                         <TouchableOpacity
@@ -219,6 +237,7 @@ const CameraScreen = ({
                         </TouchableOpacity>
                     </View>
                 ) : (
+                    /* After capture: confirm (Yes) sends to AI, Try Again discards the photo */
                     <View style={styles.confirmControls}>
                         <Text style={[styles.confirmTitle, { fontFamily: fonts.bold }]}>
                             {isChallengeMode ? `Is this ${challengeWord}?` : 'Is this your object?'}

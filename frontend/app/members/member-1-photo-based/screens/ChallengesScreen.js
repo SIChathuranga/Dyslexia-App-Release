@@ -1,3 +1,4 @@
+// ChallengesScreen — shows today's 4 challenge words, progress, and navigation to free practice / progress
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,6 +8,11 @@ import RoundedButton from '../../../components/ui/RoundedButton';
 import { colors, fonts } from '../../../theme';
 import BackButton from '../../../components/BackButton';
 
+// Props:
+//   todayChallengeWords      — array of 4 words for today
+//   completedChallengeWords  — words already spelled correctly this session
+//   hasCompletedTodayChallenge — true when all 4 are done
+//   challengeActive / challengeCurrentIndex — whether a challenge is in progress and which word
 const ChallengesScreen = ({
     onBack,
     onStartPhotoChallenge,
@@ -20,10 +26,15 @@ const ChallengesScreen = ({
 }) => {
     const totalWords = todayChallengeWords.length;
     const completedCount = completedChallengeWords.length;
+
+    // Which word index to highlight as "current" (respects in-progress challenge)
     const activeWordIndex = hasCompletedTodayChallenge
         ? Math.max(totalWords - 1, 0)
         : Math.min(challengeActive ? challengeCurrentIndex : completedCount, Math.max(totalWords - 1, 0));
+
     const currentWord = totalWords > 0 ? todayChallengeWords[activeWordIndex] : '';
+
+    // Start button label changes based on completion state
     const primaryButtonLabel = hasCompletedTodayChallenge
         ? "Play Today's Challenge Again"
         : currentWord
@@ -39,6 +50,8 @@ const ChallengesScreen = ({
         >
             <SafeAreaView style={styles.safeArea}>
                 <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+
+                    {/* Header */}
                     <View style={styles.header}>
                         <BackButton onPress={onBack} style={styles.backButton} />
                         <View style={styles.headerText}>
@@ -49,6 +62,7 @@ const ChallengesScreen = ({
                         </View>
                     </View>
 
+                    {/* Hero card — shows current word, step list, and start button */}
                     <View style={styles.heroCard}>
                         <View style={styles.heroTopRow}>
                             <View style={styles.heroBadge}>
@@ -57,6 +71,7 @@ const ChallengesScreen = ({
                                     Today&apos;s Challenge
                                 </Text>
                             </View>
+                            {/* Progress pill e.g. "2/4 done" */}
                             <View style={styles.progressPill}>
                                 <Text style={[styles.progressPillText, { fontFamily: fonts.bold }]}>
                                     {completedCount}/{todayChallengeWords.length} done
@@ -75,6 +90,7 @@ const ChallengesScreen = ({
                                 : 'The child will only see the current object. The next object appears after the current one is completed.'}
                         </Text>
 
+                        {/* Large card showing the word the child must find right now */}
                         <View style={styles.currentWordCard}>
                             <Text style={[styles.currentWordLabel, { fontFamily: fonts.bold }]}>
                                 {hasCompletedTodayChallenge
@@ -91,6 +107,7 @@ const ChallengesScreen = ({
                             </Text>
                         </View>
 
+                        {/* Step list — one row per word; completed = green tick, current = highlighted, future = locked */}
                         <View style={styles.stepList}>
                             {todayChallengeWords.map((word, index) => {
                                 const isCompleted = index < completedCount;
@@ -123,6 +140,7 @@ const ChallengesScreen = ({
                                         </View>
 
                                         <View style={styles.stepTextWrap}>
+                                            {/* Future words show "Step N" to keep them hidden */}
                                             <Text style={[styles.stepTitle, { fontFamily: fonts.bold }]}>
                                                 {showWord ? word : `Step ${index + 1}`}
                                             </Text>
@@ -150,6 +168,7 @@ const ChallengesScreen = ({
                         </RoundedButton>
                     </View>
 
+                    {/* Quick-action cards below the hero */}
                     <TouchableOpacity style={styles.actionCard} onPress={onStartPhotoChallenge} activeOpacity={0.85}>
                         <View style={[styles.actionIcon, { backgroundColor: '#DBEAFE' }]}>
                             <Camera size={22} color="#1D4ED8" />

@@ -1,3 +1,4 @@
+// SettingsScreen — lets the user change text size, font style, haptic feedback, and access the parent dashboard
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,6 +7,12 @@ import { Settings, Type, Smartphone, Users, ChevronRight, LogOut } from 'lucide-
 import { colors, fonts } from '../../../theme';
 import BackButton from '../../../components/BackButton';
 
+// Props:
+//   hapticEnabled / onToggleHaptic       — vibration on/off toggle
+//   textSize / onChangeTextSize           — 'small' | 'medium' | 'large'
+//   fontStyle / onChangeFontStyle         — 'opendyslexic' | 'sans-serif'
+//   onOpenParentDashboard                 — navigate to Progress screen in parent view
+//   currentUser / onLogout                — shown only if user is logged in
 const SettingsScreen = ({
     onBack,
     onOpenParentDashboard,
@@ -18,12 +25,14 @@ const SettingsScreen = ({
     currentUser = null,
     onLogout,
 }) => {
+    // Scale multiplier applied to font sizes throughout this screen (respects user's text size setting)
     const textScale = {
         small: 0.9,
         medium: 1,
         large: 1.2,
     }[textSize] || 1;
 
+    // Returns a style object with the correct font family and scaled font size
     const getTypography = (weight = 'regular', baseSize = null) => {
         const nextStyle = {};
 
@@ -50,6 +59,7 @@ const SettingsScreen = ({
         >
             <SafeAreaView style={styles.safeArea}>
                 <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+
                     {/* Header */}
                     <View style={styles.header}>
                         <View style={styles.headerRow}>
@@ -66,6 +76,7 @@ const SettingsScreen = ({
                         </View>
                     </View>
 
+                    {/* Account card — only rendered if a user is logged in */}
                     {currentUser && (
                         <View style={styles.accountCard}>
                             <Text style={[styles.accountTitle, getTypography('bold', 14)]}>Logged in account</Text>
@@ -74,14 +85,14 @@ const SettingsScreen = ({
                         </View>
                     )}
 
-                    {/* Accessibility Section */}
+                    {/* Accessibility section: text size, font style, haptic toggle */}
                     <View style={styles.section}>
                         <View style={styles.sectionHeader}>
                             <Type size={24} color={colors.purple} />
                             <Text style={[styles.sectionTitle, getTypography('bold', 20)]}>Accessibility</Text>
                         </View>
 
-                        {/* Text Size */}
+                        {/* Text size picker — three buttons: Small / Medium / Large */}
                         <View style={styles.option}>
                             <Text style={[styles.optionLabel, getTypography('bold', 18)]}>Text Size</Text>
                             <View style={styles.sizeButtons}>
@@ -89,10 +100,7 @@ const SettingsScreen = ({
                                     <TouchableOpacity
                                         key={size}
                                         onPress={() => onChangeTextSize?.(size)}
-                                        style={[
-                                            styles.sizeButton,
-                                            textSize === size && styles.sizeButtonActive,
-                                        ]}
+                                        style={[styles.sizeButton, textSize === size && styles.sizeButtonActive]}
                                     >
                                         <Text style={[
                                             styles.sizeButtonText,
@@ -106,7 +114,7 @@ const SettingsScreen = ({
                             </View>
                         </View>
 
-                        {/* Font Selection */}
+                        {/* Font style picker — Clean Sans Serif or OpenDyslexic */}
                         <View style={styles.option}>
                             <Text style={[styles.optionLabel, getTypography('bold', 18)]}>Font Style</Text>
                             <View style={styles.fontOptions}>
@@ -117,10 +125,7 @@ const SettingsScreen = ({
                                     <TouchableOpacity
                                         key={fontOption.value}
                                         onPress={() => onChangeFontStyle?.(fontOption.value)}
-                                        style={[
-                                            styles.fontButton,
-                                            fontStyle === fontOption.value && styles.fontButtonActive,
-                                        ]}
+                                        style={[styles.fontButton, fontStyle === fontOption.value && styles.fontButtonActive]}
                                     >
                                         <Text style={[
                                             styles.fontButtonText,
@@ -139,7 +144,7 @@ const SettingsScreen = ({
                             </View>
                         </View>
 
-                        {/* Toggles */}
+                        {/* Haptic feedback toggle — controls phone vibration on correct/wrong answers */}
                         <View style={styles.toggleOption}>
                             <View style={styles.toggleLeft}>
                                 <Smartphone size={24} color={colors.purple} />
@@ -154,7 +159,7 @@ const SettingsScreen = ({
                         </View>
                     </View>
 
-                    {/* Parent Dashboard Button */}
+                    {/* Opens the Progress screen in parent/dashboard view */}
                     <TouchableOpacity style={styles.parentButton} onPress={onOpenParentDashboard}>
                         <View style={styles.parentIcon}>
                             <Users size={24} color="#DB2777" />
@@ -163,6 +168,7 @@ const SettingsScreen = ({
                         <ChevronRight size={24} color="#9CA3AF" />
                     </TouchableOpacity>
 
+                    {/* Logout button — only shown when onLogout prop is provided */}
                     {onLogout && (
                         <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
                             <LogOut size={20} color="#DC2626" />
@@ -170,7 +176,7 @@ const SettingsScreen = ({
                         </TouchableOpacity>
                     )}
 
-                    {/* Info */}
+                    {/* App info card */}
                     <View style={styles.infoCard}>
                         <Text style={[styles.infoText, getTypography('regular', 15)]}>
                             Designed for children with dyslexia 💜
@@ -200,13 +206,8 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
         elevation: 4,
     },
-    headerRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    backButton: {
-        marginRight: 8,
-    },
+    headerRow: { flexDirection: 'row', alignItems: 'center' },
+    backButton: { marginRight: 8 },
     headerIcon: {
         backgroundColor: '#EDE9FE',
         padding: 12,
@@ -224,20 +225,9 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#E5E7EB',
     },
-    accountTitle: {
-        fontSize: 14,
-        color: '#6B7280',
-    },
-    accountName: {
-        marginTop: 6,
-        fontSize: 18,
-        color: '#111827',
-    },
-    accountEmail: {
-        marginTop: 2,
-        fontSize: 13,
-        color: '#4B5563',
-    },
+    accountTitle: { fontSize: 14, color: '#6B7280' },
+    accountName: { marginTop: 6, fontSize: 18, color: '#111827' },
+    accountEmail: { marginTop: 2, fontSize: 13, color: '#4B5563' },
     section: {
         backgroundColor: 'white',
         borderRadius: 24,
@@ -249,11 +239,7 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
         elevation: 4,
     },
-    sectionHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 24,
-    },
+    sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 24 },
     sectionTitle: { fontSize: 20, color: '#1F2937', marginLeft: 12 },
     option: { marginBottom: 24 },
     optionLabel: { fontSize: 18, color: '#374151', marginBottom: 12 },
@@ -325,11 +311,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         marginBottom: 16,
     },
-    logoutText: {
-        marginLeft: 8,
-        fontSize: 16,
-        color: '#B91C1C',
-    },
+    logoutText: { marginLeft: 8, fontSize: 16, color: '#B91C1C' },
     infoCard: {
         backgroundColor: '#EDE9FE',
         borderWidth: 4,

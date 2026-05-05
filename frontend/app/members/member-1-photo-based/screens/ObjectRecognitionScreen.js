@@ -1,3 +1,4 @@
+// ObjectRecognitionScreen — shows the AI-detected object, breaks the word into syllables, and lets the child proceed to speak
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +11,11 @@ import { colors, fonts } from '../../../theme';
 import { getSyllablesWithColors } from '../../../utils/syllableUtils';
 import * as Speech from 'expo-speech';
 
+// Props:
+//   detectedObject        — { label, imageUri } from CameraScreen
+//   onStartChallenge      — navigate to SpeakNowScreen
+//   onHome                — exit to home or quit challenge
+//   challengeWord / challengeIndex / challengeTotal / completedChallengeCount — used to show challenge banner
 const ObjectRecognitionScreen = ({
     detectedObject,
     onStartChallenge,
@@ -20,15 +26,19 @@ const ObjectRecognitionScreen = ({
     completedChallengeCount = 0,
 }) => {
     const { label = 'APPLE', imageUri } = detectedObject || {};
+
+    // Colour-coded syllable array e.g. [{text:'AP', color:'#...'}, {text:'PLE', color:'#...'}]
     const phonemes = getSyllablesWithColors(label);
     const isChallengeMode = Boolean(challengeWord);
 
+    // Read the word aloud using text-to-speech at a slightly slower rate for clarity
     const speakWord = () => {
         if (!label) return;
         Speech.stop();
         Speech.speak(label, { language: 'en', rate: 0.85, pitch: 1.0 });
     };
 
+    // Auto-speak when the screen mounts so the child immediately hears the word
     useEffect(() => {
         speakWord();
     }, [label]);
@@ -41,7 +51,7 @@ const ObjectRecognitionScreen = ({
             style={styles.container}
         >
             <SafeAreaView style={styles.safeArea}>
-                {/* Home Button */}
+                {/* Home button — absolute top-left */}
                 <TouchableOpacity style={styles.homeButton} onPress={onHome}>
                     <Home size={24} color="#581C87" />
                 </TouchableOpacity>
@@ -52,6 +62,7 @@ const ObjectRecognitionScreen = ({
                     </View>
 
                     <View style={styles.card}>
+                        {/* Challenge banner — only shown in challenge mode */}
                         {isChallengeMode && (
                             <View style={styles.challengeBanner}>
                                 <Text style={[styles.challengeBannerLabel, { fontFamily: fonts.bold }]}>
@@ -63,11 +74,13 @@ const ObjectRecognitionScreen = ({
                             </View>
                         )}
 
+                        {/* Detected object name */}
                         <View style={styles.cardHeader}>
                             <Text style={[styles.foundLabel, { fontFamily: fonts.regular }]}>I found:</Text>
                             <Text style={[styles.objectName, { fontFamily: fonts.bold }]}>{label}</Text>
                         </View>
 
+                        {/* Photo taken by the child, or placeholder if no image */}
                         <View style={styles.imageWrapper}>
                             {imageUri ? (
                                 <Image source={{ uri: imageUri }} style={styles.objectImage} />
@@ -78,11 +91,13 @@ const ObjectRecognitionScreen = ({
                             )}
                         </View>
 
+                        {/* Syllable breakdown + Listen button */}
                         <View style={styles.phonemeSection}>
                             <Text style={[styles.breakdownLabel, { fontFamily: fonts.bold }]}>
                                 Let's break it down:
                             </Text>
 
+                            {/* Colour-coded syllables separated by dots */}
                             <View style={styles.phonemeRow}>
                                 {phonemes.map((phoneme, index) => (
                                     <React.Fragment key={index}>
@@ -98,6 +113,7 @@ const ObjectRecognitionScreen = ({
                                 ))}
                             </View>
 
+                            {/* Tap to hear the word spoken again */}
                             <TouchableOpacity style={styles.listenButton} onPress={speakWord} activeOpacity={0.8}>
                                 <Volume2 size={20} color="#4C1D95" />
                                 <Text style={[styles.listenButtonText, { fontFamily: fonts.bold }]}>
@@ -113,6 +129,7 @@ const ObjectRecognitionScreen = ({
                         </View>
                     </View>
 
+                    {/* Main CTA — navigates to SpeakNowScreen */}
                     <View style={styles.buttonContainer}>
                         <RoundedButton
                             variant="primary"

@@ -1,4 +1,12 @@
 import { getBackendUrl } from '../../../services/apiHub';
+import { Platform } from 'react-native';
+
+let FileSystem = null;
+try {
+  FileSystem = require('expo-file-system');
+} catch (e) {
+  console.warn('[modelService] FileSystem not available (web environment)');
+}
 
 const ACTION_API_URL = getBackendUrl('actions');
 
@@ -7,16 +15,65 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const SAMPLE_COUNT = Number(process.env.EXPO_PUBLIC_ACTION_SAMPLE_COUNT || 3);
 const SAMPLE_INTERVAL_MS = Number(process.env.EXPO_PUBLIC_ACTION_SAMPLE_INTERVAL_MS || 100);
 
-const captureFrameBlob = async (videoEl) => {
-  const canvas = document.createElement('canvas');
-  canvas.width = videoEl.videoWidth || 640;
-  canvas.height = videoEl.videoHeight || 480;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+// Handle both web (video element) and React Native (photo object) inputs
+const captureFrameBlob = async (input) => {
+  // React Native: input is a photo object from expo-camera (only on native, not web)
+  if (
+    FileSystem &&
+    input &&
+    typeof input === 'object' &&
+    input.uri &&
+    !input.videoWidth &&
+    Platform.OS !== 'web'
+  ) {
+    try {
+      const base64 = await FileSystem.readAsStringAsync(input.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      const blob = new Blob(
+        [Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))],
+        { type: 'image/jpeg' }
+      );
+      return blob;
+    } catch (error) {
+      console.error('[captureFrameBlob] Failed to read React Native photo:', error);
+      return null;
+    }
+  }
 
-  return new Promise((resolve) => {
-    canvas.toBlob(resolve, 'image/jpeg', 0.85);
-  });
+  // Web: input is an HTML video element
+  if (typeof document !== 'undefined' && input && input.videoWidth) {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = input.videoWidth || 640;
+      canvas.height = input.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(input, 0, 0, canvas.width, canvas.height);
+
+      return new Promise((resolve) => {
+        canvas.toBlob(resolve, 'image/jpeg', 0.85);
+      });
+    } catch (error) {
+      console.error('[captureFrameBlob] Failed to capture web video frame:', error);
+      return null;
+    }
+  }
+
+  // Fallback: try to extract from data URL or other formats
+  if (input && typeof input === 'object' && input.uri) {
+    try {
+      // Try fetching from URI (works for data URLs and web URLs)
+      const response = await fetch(input.uri);
+      const blob = await response.blob();
+      return blob;
+    } catch (error) {
+      console.error('[captureFrameBlob] Failed to fetch from URI:', error);
+      return null;
+    }
+  }
+
+  console.warn('[captureFrameBlob] Invalid input - unable to process');
+  return null;
 };
 
 const postPrediction = async (instruction, blob, index) => {
@@ -71,16 +128,16 @@ const aggregatePredictions = (samples) => {
 };
 
 /**
- * Grabs one frame from a <video> element via an off-screen <canvas>,
+ * Grabs one frame from either a <video> element (web) or expo-camera photo (React Native),
  * converts it to a JPEG Blob, and POSTs it to the action-detection API.
  *
  * @param {string}           instruction - Natural-language action description
- * @param {HTMLVideoElement} videoEl     - The always-mounted hidden <video> ref
+ * @param {HTMLVideoElement|Object} input - The <video> ref (web) or photo object from takePictureAsync (React Native)
  * @returns {Promise<object|null>}       - Parsed JSON response or null on failure
  */
-export const sendFrameToAPI = async (instruction, videoEl) => {
-  if (!videoEl) {
-    console.warn('[modelService] videoEl is null — camera not ready');
+export const sendFrameToAPI = async (instruction, input) => {
+  if (!input) {
+    console.warn('[modelService] input is null — camera not ready');
     return null;
   }
 
@@ -89,7 +146,7 @@ export const sendFrameToAPI = async (instruction, videoEl) => {
     const results = [];
 
     for (let index = 0; index < sampleCount; index += 1) {
-      const blob = await captureFrameBlob(videoEl);
+      const blob = await captureFrameBlob(input);
       if (blob) {
         try {
           const data = await postPrediction(instruction, blob, index);

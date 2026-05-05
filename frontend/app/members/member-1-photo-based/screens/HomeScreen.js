@@ -1,10 +1,6 @@
-/**
- * HomeScreen - Photo-Based Spelling Challenge
- * Kids-friendly home screen for the Spelling Challenge module.
- * Uses dyslexia-friendly colors, OpenDyslexic font, and animated game cards.
- */
+// HomeScreen — main menu for the Photo Spelling module; shows navigation cards for camera, challenges, and progress
 
-import React, { useState, useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -21,7 +17,7 @@ import BackendStatusDot from '../../../components/ui/BackendStatusDot';
 import { colors, fonts } from '../../../theme';
 import BackButton from '../../../components/BackButton';
 
-// ── Small inline owl icon ─────────────────────────────────────────────────────
+// Inline SVG owl mascot drawn with basic shapes
 const TinyOwl = ({ size = 48 }) => (
   <Svg viewBox="0 0 100 100" width={size} height={size}>
     <Ellipse cx="50" cy="65" rx="30" ry="32" fill={colors.green} />
@@ -43,12 +39,13 @@ const TinyOwl = ({ size = 48 }) => (
   </Svg>
 );
 
-// ── Animated game card ────────────────────────────────────────────────────────
+// Animated card — fades in + slides up on mount; scales down slightly on press
 const GameCard = ({ title, description, emoji, gradientColors, onPress, delay = 0 }) => {
   const scale = useRef(new Animated.Value(1)).current;
   const fadeIn = useRef(new Animated.Value(0)).current;
   const slideUp = useRef(new Animated.Value(30)).current;
 
+  // Entrance animation: fade in + slide up, staggered by `delay` ms
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeIn, {
@@ -96,11 +93,13 @@ const GameCard = ({ title, description, emoji, gradientColors, onPress, delay = 
   );
 };
 
-// ── Main screen ───────────────────────────────────────────────────────────────
+// Main screen component
 export default function HomeScreen({ onNavigate, onBack }) {
+  // owlBounce drives the gentle up-down float animation on the owl icon
   const owlBounce = useRef(new Animated.Value(0)).current;
   const insets = useSafeAreaInsets();
 
+  // Loop: move owl up 6px, back down, pause 2.5s, repeat
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
@@ -111,6 +110,7 @@ export default function HomeScreen({ onNavigate, onBack }) {
     ).start();
   }, []);
 
+  // Each entry maps to one GameCard; route is the screen name passed to onNavigate
   const GAMES = [
     {
       title: 'Take Photo',
@@ -143,7 +143,7 @@ export default function HomeScreen({ onNavigate, onBack }) {
       style={styles.container}
     >
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Top bar */}
+        {/* Top bar with back button and title */}
         <View style={styles.topBar}>
           <BackButton onPress={onBack} />
           <Text style={styles.topTitle}>Photo Spelling Fun</Text>
@@ -154,7 +154,7 @@ export default function HomeScreen({ onNavigate, onBack }) {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.scroll, { paddingBottom: 32 + insets.bottom + 70 }]}
         >
-          {/* Header card with owl */}
+          {/* Header card: bouncing owl + BackendStatusDot (shows if server is online) */}
           <View style={styles.headerCard}>
             <Animated.View style={{ transform: [{ translateY: owlBounce }] }}>
               <TinyOwl size={64} />
@@ -166,7 +166,7 @@ export default function HomeScreen({ onNavigate, onBack }) {
             <BackendStatusDot backendKey="photoSpelling" />
           </View>
 
-          {/* Game cards */}
+          {/* Game cards — each navigates to a different screen */}
           <View style={styles.gameList}>
             {GAMES.map((game, i) => (
               <GameCard
@@ -176,13 +176,10 @@ export default function HomeScreen({ onNavigate, onBack }) {
                 emoji={game.emoji}
                 gradientColors={game.gradientColors}
                 onPress={() => onNavigate(game.route)}
-                delay={i * 80}
+                delay={i * 80}  // stagger entrance animations
               />
             ))}
           </View>
-
-          
-          
         </ScrollView>
       </SafeAreaView>
     </LinearGradient>
@@ -222,8 +219,6 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 32,
   },
-
-  // Header
   headerCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -249,8 +244,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 3,
   },
-
-  // Game cards
   gameList: {
     marginTop: 8,
   },
@@ -293,8 +286,4 @@ const styles = StyleSheet.create({
     color: 'rgba(0,0,0,0.3)',
     marginLeft: 8,
   },
-
 });
-
-
-

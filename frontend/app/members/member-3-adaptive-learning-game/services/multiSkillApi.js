@@ -13,6 +13,9 @@
  *   GET  /progress/:userId  - Get user progress/diagnosis report
  *   GET  /history/:userId   - Get raw session history
  *   GET  /users             - List all users
+ *   POST /auth/register     - Register a new user
+ *   POST /auth/login        - Login and get session token
+ *   GET  /auth/me          - Get current user details
  *
  * ================================================================================
  */
@@ -24,6 +27,15 @@ const getBaseUrl = () => getBackendUrl('multiSkill');
 // Render free tier can take up to 60s to wake from sleep
 const FETCH_TIMEOUT_MS = 90000;
 
+let authToken = null;
+
+/**
+ * Set the authentication token to be used in headers.
+ */
+export const setAuthToken = (token) => {
+  authToken = token;
+};
+
 /**
  * Wrapper around fetch with timeout support for Render cold starts.
  */
@@ -31,9 +43,19 @@ const fetchWithTimeout = async (url, options = {}) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
+  };
+
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
+  }
+
   try {
     const response = await fetch(url, {
       ...options,
+      headers,
       signal: controller.signal,
     });
     clearTimeout(timeout);
@@ -144,6 +166,50 @@ export const getHistory = async (userId) => {
 export const getUsers = async () => {
   const baseUrl = getBaseUrl();
   const response = await fetchWithTimeout(`${baseUrl}/users`);
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+  }
+  return await response.json();
+};
+/**
+ * Register a new user.
+ */
+export const register = async (userData) => {
+  const baseUrl = getBaseUrl();
+  const response = await fetchWithTimeout(`${baseUrl}/auth/register`, {
+    method: 'POST',
+    body: JSON.stringify(userData),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+  }
+  return await response.json();
+};
+
+/**
+ * Login an existing user.
+ */
+export const login = async (credentials) => {
+  const baseUrl = getBaseUrl();
+  const response = await fetchWithTimeout(`${baseUrl}/auth/login`, {
+    method: 'POST',
+    body: JSON.stringify(credentials),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+  }
+  return await response.json();
+};
+
+/**
+ * Get current user details.
+ */
+export const getMe = async () => {
+  const baseUrl = getBaseUrl();
+  const response = await fetchWithTimeout(`${baseUrl}/auth/me`);
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.error || `HTTP error! status: ${response.status}`);

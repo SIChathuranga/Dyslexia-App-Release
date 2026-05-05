@@ -24,7 +24,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Type, Smartphone, Users, ChevronRight, Info } from 'lucide-react-native';
+import { Type, Smartphone, Users, ChevronRight, Info, LogOut } from 'lucide-react-native';
 import { colors, fonts } from '../theme';
 import BackButton from '../components/BackButton';
 import {
@@ -32,6 +32,8 @@ import {
   getAccessibilityPreferences,
   saveAccessibilityPreferences,
 } from '../services/accessibilityPreferences.js';
+import { clearAuthSession } from '../services/authSession';
+import { setAuthToken } from '../members/member-3-adaptive-learning-game/services/multiSkillApi';
 
 // Helper Section wrapper
 const SettingsSection = ({ icon: Icon, iconBg, title, children }) => (
@@ -79,7 +81,7 @@ const sectionStyles = StyleSheet.create({
 });
 
 // ── Main component ────────────────────────────────────────────────────────────
-const UnifiedSettingsScreen = ({ navigation }) => {
+const UnifiedSettingsScreen = ({ navigation, onLogout }) => {
   const [textSize, setTextSizeState] = useState(DEFAULT_ACCESSIBILITY_PREFERENCES.textSize);
   const [fontStyle, setFontStyleState] = useState(DEFAULT_ACCESSIBILITY_PREFERENCES.fontStyle);
   const [hapticEnabled, setHapticEnabled] = useState(true);
@@ -94,6 +96,7 @@ const UnifiedSettingsScreen = ({ navigation }) => {
       .then((prefs) => {
         setTextSizeState(prefs.textSize || DEFAULT_ACCESSIBILITY_PREFERENCES.textSize);
         setFontStyleState(prefs.fontStyle || DEFAULT_ACCESSIBILITY_PREFERENCES.fontStyle);
+        setHapticEnabled(prefs.hapticEnabled !== undefined ? prefs.hapticEnabled : true);
       })
       .catch(() => {});
 
@@ -105,12 +108,28 @@ const UnifiedSettingsScreen = ({ navigation }) => {
 
   const handleTextSize = (size) => {
     setTextSizeState(size);
-    saveAccessibilityPreferences({ textSize: size, fontStyle }).catch(() => {});
+    saveAccessibilityPreferences({ textSize: size, fontStyle, hapticEnabled }).catch(() => {});
   };
 
   const handleFontStyle = (style) => {
     setFontStyleState(style);
-    saveAccessibilityPreferences({ textSize, fontStyle: style }).catch(() => {});
+    saveAccessibilityPreferences({ textSize, fontStyle: style, hapticEnabled }).catch(() => {});
+  };
+
+  const handleHapticToggle = (value) => {
+    setHapticEnabled(value);
+    saveAccessibilityPreferences({ textSize, fontStyle, hapticEnabled: value }).catch(() => {});
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await clearAuthSession();
+      if (onLogout) {
+        onLogout();
+      }
+    } catch (error) {
+      console.error('Sign Out Error:', error);
+    }
   };
 
   const sizeLabels = { small: 'Small A', medium: 'Medium A', large: 'Large A' };
@@ -197,7 +216,7 @@ const UnifiedSettingsScreen = ({ navigation }) => {
                 </View>
                 <Switch
                   value={hapticEnabled}
-                  onValueChange={setHapticEnabled}
+                  onValueChange={handleHapticToggle}
                   trackColor={{ false: '#D1D5DB', true: colors.purple }}
                   thumbColor="white"
                 />
@@ -242,6 +261,16 @@ const UnifiedSettingsScreen = ({ navigation }) => {
                 <Text style={styles.infoValue}>4 Active</Text>
               </View>
             </SettingsSection>
+
+            {/* ── Account / Sign Out ── */}
+            <TouchableOpacity
+              style={styles.signOutBtn}
+              onPress={handleSignOut}
+              activeOpacity={0.8}
+            >
+              <LogOut size={20} color="#EF4444" style={{ marginRight: 10 }} />
+              <Text style={styles.signOutText}>Sign Out</Text>
+            </TouchableOpacity>
 
             {/* Footer note */}
             <View style={styles.footer}>
@@ -347,8 +376,27 @@ const styles = StyleSheet.create({
   infoValue: { fontFamily: fonts.bold, fontSize: 14, color: '#1F2937' },
 
   // Footer
-  footer: { alignItems: 'center', marginTop: 8 },
+  footer: { alignItems: 'center', marginTop: 16 },
   footerText: { fontFamily: fonts.regular, fontSize: 13, color: '#9CA3AF' },
+
+  // Sign out
+  signOutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FEE2E2',
+    borderRadius: 20,
+    paddingVertical: 16,
+    marginTop: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  signOutText: {
+    fontFamily: fonts.bold,
+    fontSize: 16,
+    color: '#EF4444',
+  },
 });
 
 export default UnifiedSettingsScreen;

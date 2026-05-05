@@ -10,20 +10,36 @@ const STORAGE_KEY = 'dyslearn_assessments';
 
 const toNumberOrNull = (value) => {
   const n = Number(value);
-  return Number.isFinite(n) ? n : null;
+  const result = Number.isFinite(n) ? n : null;
+  console.log('[toNumberOrNull]', { input: value, output: result });
+  return result;
 };
 
 const getSessionUserId = (session) => {
+  console.log('[getSessionUserId] Full session object:', JSON.stringify(session, null, 2));
+  
   const rawId =
     session?.user?.id ??
     session?.user?.user_id ??
     session?.user_id ??
     session?.id;
 
-  return toNumberOrNull(rawId);
+  console.log('[getSessionUserId] Raw ID extracted:', rawId);
+  
+  const result = toNumberOrNull(rawId);
+  console.log('[getSessionUserId] Final result:', result);
+  
+  return result;
 };
 
 const getAssessmentPayload = ({ modelPrediction, type, summary, timestamp, userId }) => {
+  console.log('[getAssessmentPayload] Creating payload', {
+    type,
+    userId,
+    modelPrediction,
+    timestamp,
+  });
+
   const probability = Number(modelPrediction?.probability ?? 0);
   const boundedProbability = Math.max(0, Math.min(1, probability));
   const features = modelPrediction?.features || {};
@@ -36,7 +52,7 @@ const getAssessmentPayload = ({ modelPrediction, type, summary, timestamp, userI
   const reactionTime = Number(features.reaction_time);
   const responseTime = Number.isFinite(reactionTime) ? reactionTime : 0;
 
-  return {
+  const finalPayload = {
     user_id: userId,
     accuracy: Number((boundedProbability * 100).toFixed(2)),
     completion_rate: Number(completionRate.toFixed(2)),
@@ -46,6 +62,9 @@ const getAssessmentPayload = ({ modelPrediction, type, summary, timestamp, userI
     assessment_type: type,
     notes: summary || '',
   };
+
+  console.log('[getAssessmentPayload] Final payload', finalPayload);
+  return finalPayload;
 };
 
 /**
@@ -121,6 +140,8 @@ export const saveModelPredictionAsAssessment = async (
   summary
 ) => {
   try {
+    console.log('[assessmentHelper] Starting assessment save:', { type, summary });
+    
     const timestamp = new Date().toISOString();
     const record = {
       id: `${type}_${Date.now()}`,
@@ -132,14 +153,21 @@ export const saveModelPredictionAsAssessment = async (
       timestamp,
     };
 
+    // Save locally first
     const existing = await loadAssessments();
-    // Newest first — keep last 100 records maximum
     const updated = [record, ...existing].slice(0, 100);
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    console.log('[assessmentHelper] Local storage saved:', record.id);
 
+    // Try to save remotely
     const session = await getAuthSession();
+    console.log('[assessmentHelper] Session check - Valid?', isSessionValid(session));
+    console.log('[assessmentHelper] Full session object:', JSON.stringify(session, null, 2));
+    
     if (isSessionValid(session)) {
       const userId = getSessionUserId(session);
+      console.log('[assessmentHelper] Extracted userId:', userId);
+      
       if (userId) {
         setAuthToken(session.token);
         const payload = getAssessmentPayload({
@@ -149,17 +177,36 @@ export const saveModelPredictionAsAssessment = async (
           timestamp,
           userId,
         });
+        
+        console.log('[assessmentHelper] About to call saveAssessmentHistoryRemote with payload:', payload);
 
         try {
-          await saveAssessmentHistoryRemote(payload);
+          const response = await saveAssessmentHistoryRemote(payload);
+          console.log('[assessmentHelper] Remote save SUCCESS:', response);
         } catch (remoteError) {
+          console.error('[assessmentHelper] Remote assessment save FAILED:', {
+            message: remoteError?.message,
+            response: remoteError?.response?.data,
+            status: remoteError?.response?.status,
+            statusText: remoteError?.response?.statusText,
+            code: remoteError?.code,
+            config: {
+              url: remoteError?.config?.url,
+              method: remoteError?.config?.method,
+              baseURL: remoteError?.config?.baseURL,
+            },
+            fullError: remoteError,
+          });
           // Local persistence already succeeded; keep UX non-blocking.
-          console.warn('[assessmentHelper] Remote assessment save failed:', remoteError?.message || remoteError);
         }
+      } else {
+        console.warn('[assessmentHelper] No user ID found in session');
       }
+    } else {
+      console.warn('[assessmentHelper] Session not valid - cannot save remotely');
     }
 
-    console.log('[assessmentHelper] Assessment saved:', record.id);
+    console.log('[assessmentHelper] Assessment completed:', record.id);
     return record;
   } catch (error) {
     console.error('[assessmentHelper] Failed to save assessment:', error);

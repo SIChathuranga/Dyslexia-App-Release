@@ -22,10 +22,12 @@
 import { Text } from '../components/DyslexicText';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator, RefreshControl, Animated } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import { colors, spacing, borderRadius, fontSizes, fontWeights, letterSpacing, } from '../theme/colors';
 import { SessionTracker, ACTIVITY_DISPLAY_NAMES, ACTIVITY_EMOJIS, ACTIVITY_COLORS, } from '../services/SessionTracker';
+import { useFocusEffect } from '@react-navigation/native';
+import BackButton from '../../../components/BackButton';
 // ============================================================================
 // CONSTANTS
 // ============================================================================
@@ -355,7 +357,26 @@ const suggestionStyles = StyleSheet.create({
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
-export const ProgressDashboardScreen = () => {
+export const ProgressDashboardScreen = ({ navigation }) => {
+    // ========================================================================
+    // SETUP HEADER WITH BACK BUTTON
+    // ========================================================================
+    useFocusEffect(
+        useCallback(() => {
+            navigation?.setOptions({
+                title: '📊 Progress Dashboard',
+                headerLeft: () => (
+                    <BackButton
+                        onPress={() => navigation?.goBack()}
+                        style={{ marginRight: 8 }}
+                        iconColor={colors.text}
+                        size={22}
+                    />
+                ),
+            });
+        }, [navigation])
+    );
+
     // ========================================================================
     // STATE
     // ========================================================================

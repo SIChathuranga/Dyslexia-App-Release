@@ -5,6 +5,7 @@ const ACCESSIBILITY_KEY = '@dyslexia_accessibility_preferences';
 export const DEFAULT_ACCESSIBILITY_PREFERENCES = {
     textSize: 'medium',
     fontStyle: 'opendyslexic',
+    hapticEnabled: true,
 };
 
 export const getAccessibilityPreferences = async () => {
@@ -19,6 +20,7 @@ export const getAccessibilityPreferences = async () => {
         return {
             textSize: parsed?.textSize || DEFAULT_ACCESSIBILITY_PREFERENCES.textSize,
             fontStyle: parsed?.fontStyle || DEFAULT_ACCESSIBILITY_PREFERENCES.fontStyle,
+            hapticEnabled: parsed?.hapticEnabled !== undefined ? parsed.hapticEnabled : DEFAULT_ACCESSIBILITY_PREFERENCES.hapticEnabled,
         };
     } catch {
         return DEFAULT_ACCESSIBILITY_PREFERENCES;
@@ -32,6 +34,7 @@ export const saveAccessibilityPreferences = async (preferences) => {
         JSON.stringify({
             textSize: preferences?.textSize || DEFAULT_ACCESSIBILITY_PREFERENCES.textSize,
             fontStyle: preferences?.fontStyle || DEFAULT_ACCESSIBILITY_PREFERENCES.fontStyle,
+            hapticEnabled: preferences?.hapticEnabled !== undefined ? preferences.hapticEnabled : DEFAULT_ACCESSIBILITY_PREFERENCES.hapticEnabled,
         })
     );
 };

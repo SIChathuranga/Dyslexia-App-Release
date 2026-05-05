@@ -610,17 +610,17 @@ async def detect_object(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail="Model not loaded")
 
     try:
-        # Read image and auto-orient (phones embed EXIF rotation metadata)
+        # Read image 
         contents = await file.read()
         image = ImageOps.exif_transpose(Image.open(io.BytesIO(contents)))
 
-        # Run YOLO inference in a thread so it doesn't block the event loop
+        # Run YOLO inference in a thread so it doesn't block the event loop (Run in separate thread because YOLO is blocking and takes time to process)
         loop = asyncio.get_event_loop()
-        results = await loop.run_in_executor(_yolo_executor, lambda: model(image))
+        results = await loop.run_in_executor(_yolo_executor, lambda: model(image)) 
         
         # Process results — take the detection with highest confidence above threshold
         best_box = None
-        max_conf = -1.0
+        max_conf = -1.0 
         
         for r in results:
             boxes = r.boxes
@@ -628,11 +628,11 @@ async def detect_object(file: UploadFile = File(...)):
                 conf = float(box.conf[0])
                 cls_id = int(box.cls[0])
                 label = model.names[cls_id]
-                
+                #find the object with the highest confidence above threshold (if detected more than one object)
                 if conf > max_conf and conf >= MIN_DETECTION_CONFIDENCE:
                     max_conf = conf
                     best_box = label
-
+        #return the object with the highest confidence above threshold
         if best_box:
             return {
                 "label": best_box,
@@ -654,30 +654,39 @@ async def detect_object(file: UploadFile = File(...)):
 @app.post("/speech-to-text")
 async def speech_to_text(file: UploadFile = File(...)):
     """
-    Receives an audio file, sends to OpenAI Whisper.
-    Returns transcribed text.
+    Get an audio file from the app.
+    Convert the child's voice into English text.
+    Send the text back to the app.
     """
     if not speech_model:
         raise HTTPException(status_code=500, detail="Speech model not loaded")
         
     try:
-        # Save temp file because Whisper reads from file path
-        # Use a random name to avoid path traversal via user-supplied filename
+        # Take the file extension from the uploaded audio file.
+        # If the file has no name, use ".m4a" as the default extension.
         safe_ext = os.path.splitext(file.filename or "audio.m4a")[1] or ".m4a"
+
+        # Only allow a short normal extension. 
+        # This avoids unsafe or strange file names.
         safe_ext = safe_ext if safe_ext.isascii() and len(safe_ext) <= 10 else ".m4a"
-        # Write to system temp dir (/tmp) to avoid permission issues in containers
+
+        # Create a temporary audio file on the server.
+        # Whisper needs a real file path, so we save the upload first.
         fd, filename = tempfile.mkstemp(suffix=safe_ext, prefix="whisper_")
         try:
+            # Copy the uploaded audio into the temporary file.
             with os.fdopen(fd, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
         except Exception:
+            # Close the file if copying fails.
             os.close(fd)
             raise
         
-        # Run faster-whisper in a thread so the event loop stays responsive
+        # Get the current async event loop.
         loop = asyncio.get_event_loop()
 
         def _do_transcribe():
+            # Ask Whisper to listen to the audio file and return English text.
             segments, _info = speech_model.transcribe(
                 filename,
                 language="en",
@@ -687,18 +696,24 @@ async def speech_to_text(file: UploadFile = File(...)):
                 condition_on_previous_text=False,
                 initial_prompt="A single spoken English word.",
             )
+
+            # Join all text parts into one sentence.
             return " ".join(seg.text for seg in segments)
 
+        # Run Whisper in a background thread.
+        # This keeps the API server free to handle other requests.
         text = await loop.run_in_executor(_whisper_executor, _do_transcribe)
         
-        # Cleanup
+        # Delete the temporary audio file after transcription.
         os.remove(filename)
         
+        # Send the final text back to the frontend.
         return {"text": text.strip()}
 
     except Exception as e:
         print(f"Error in /speech-to-text: {e}")
-        # Cleanup if failed
+
+        # If an error happens, delete the temporary file if it was created.
         if 'filename' in locals() and os.path.exists(filename):
             os.remove(filename)
         raise HTTPException(status_code=500, detail=str(e))
@@ -707,25 +722,42 @@ async def speech_to_text(file: UploadFile = File(...)):
 @app.post("/verify-answer")
 async def verify_answer(detected_label: str, spoken_text: str):
     """
-    Compare the detected label with the spoken text using exact, phrase, and fuzzy matching.
+    Check if the child said the correct word.
+    Compare the word found in the photo with the word from speech-to-text.
+    Return true if they match closely enough.
     """
+    # Clean both words before comparing them.
+    # Example: "Apple!" becomes "apple".
     norm_detected = normalize_text(detected_label)
     norm_spoken = normalize_text(spoken_text)
 
     if not norm_detected or not norm_spoken:
+        # If one of the words is empty, the answer is not correct.
         is_correct = False
         match_type = "none"
         similarity = 0.0
     else:
+        # Exact match means both words are the same.
+        # Example: "apple" and "apple".
         is_exact_match = norm_spoken == norm_detected
+
+        # Phrase match means the expected word is inside the spoken text.
+        # Example: spoken text "I said apple", expected word "apple".
         is_phrase_match = not is_exact_match and contains_whole_phrase(norm_spoken, norm_detected)
+
+        # Fuzzy match is used for small spelling or speech-to-text mistakes.
+        # Example: "appel" can still be close to "apple".
         is_fuzzy = False
         similarity = 1.0 if is_exact_match else 0.0
 
+        # Only use fuzzy match if exact and phrase match both failed.
         if not is_exact_match and not is_phrase_match:
             is_fuzzy, similarity = fuzzy_word_match(norm_spoken, norm_detected)
 
+        # The answer is correct if any match type passed.
         is_correct = is_exact_match or is_phrase_match or is_fuzzy
+
+        # Save which match method worked.
         match_type = (
             "exact" if is_exact_match
             else "phrase" if is_phrase_match
@@ -733,6 +765,7 @@ async def verify_answer(detected_label: str, spoken_text: str):
             else "none"
         )
 
+    # Send the result back to the frontend.
     return {
         "correct": is_correct,
         "input_label": detected_label,

@@ -9,12 +9,14 @@ import {
   View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { sendFrameToAPI } from '../services/modelService';
 import { Colors } from '../../../theme/colors';
 import { fonts } from '../../../theme';
 import { saveModelPredictionAsAssessment } from '../utils/assessmentHelper';
 
 const MemoryAssessmentScreen = ({ navigation }) => {
+  const [permission, requestPermission] = useCameraPermissions();
   const [commands] = useState([
     'Touch your nose',
     'Wave your hand',
@@ -37,74 +39,55 @@ const MemoryAssessmentScreen = ({ navigation }) => {
   const [isCameraReady, setIsCameraReady] = useState(false);
 
   const videoRef = useRef(null);
-  const streamRef = useRef(null);
-  const visibleVideoRef = useRef(null);
+  const cameraRef = useRef(null);
 
   // ── Camera lifecycle ─────────────────────────────────────────────────────────
   useEffect(() => {
-    const startCamera = async () => {
-      if (isValidating && !streamRef.current) {
-        try {
-          setIsCameraReady(false);
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'user' },
-          });
-          streamRef.current = stream;
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-            await videoRef.current.play();
-          }
-          if (visibleVideoRef.current) {
-            visibleVideoRef.current.srcObject = stream;
-            await visibleVideoRef.current.play();
-          }
-          setIsCameraReady(true);
-        } catch (error) {
-          console.error('Failed to access camera:', error);
-          Alert.alert('Camera Error', 'Could not access camera. Please check permissions.');
-          setIsValidating(false);
-          setIsCameraReady(false);
-        }
-      }
-    };
-
-    const stopCamera = () => {
-      if (!isValidating && streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-        if (videoRef.current) videoRef.current.srcObject = null;
-        if (visibleVideoRef.current) visibleVideoRef.current.srcObject = null;
-        setIsCameraReady(false);
-      }
-    };
-
-    if (isValidating) {
-      startCamera();
-    } else {
-      stopCamera();
+    if (isValidating && !permission?.granted) {
+      requestPermission();
     }
-
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-      }
-    };
-  }, [isValidating]);
+  }, [isValidating, permission?.granted]);
 
   // ── AI validation ────────────────────────────────────────────────────────────
   useEffect(() => {
     const performValidation = async () => {
-      if (isCameraReady && detectionStatus === 'waiting' && isValidating) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
+      if (isCameraReady && detectionStatus === 'waiting' && isValidating && cameraRef.current) {
+        // Longer initial delay to ensure camera has buffered data (especially on web)
+        await new Promise((resolve) => setTimeout(resolve, 1500));
         if (!isValidating) return;
 
         setDetectionStatus('detecting');
 
         try {
+          let photo = null;
+          let retries = 0;
+          const maxRetries = 3;
+
+          // Retry logic for camera capture (handles web camera buffering issues)
+          while (!photo && retries < maxRetries) {
+            try {
+              photo = await cameraRef.current.takePictureAsync({ 
+                base64: false,
+                quality: 0.85,
+              });
+            } catch (captureError) {
+              retries++;
+              if (retries < maxRetries) {
+                console.warn(`[MemoryAssessment] Camera capture attempt ${retries} failed, retrying...`);
+                await new Promise((resolve) => setTimeout(resolve, 500));
+              } else {
+                throw captureError;
+              }
+            }
+          }
+
+          if (!photo) {
+            throw new Error('Failed to capture photo after multiple retries');
+          }
+          
           const data = await sendFrameToAPI(
             commands[currentValidationStep],
-            videoRef.current
+            photo
           );
 
           if (!data) {
@@ -150,6 +133,8 @@ const MemoryAssessmentScreen = ({ navigation }) => {
   const saveAssessment = async (correctCount, percentage) => {
     try {
       setIsSaving(true);
+      console.log('[MemoryAssessment] Saving assessment:', { correctCount, percentage, commands: commands.length });
+      
       const modelPrediction = {
         prediction:  correctCount === commands.length ? 1 : 0,
         probability: percentage / 100,
@@ -162,11 +147,16 @@ const MemoryAssessmentScreen = ({ navigation }) => {
           error_repetition_count:  commands.length - correctCount,
         },
       };
+      
+      console.log('[MemoryAssessment] Model prediction:', modelPrediction);
+      
       await saveModelPredictionAsAssessment(
         modelPrediction,
         'MEMORY_ASSESSMENT',
         `Completed ${correctCount}/${commands.length} memory actions. Score: ${validationScore}/${commands.length * 100}`
       );
+      
+      console.log('[MemoryAssessment] Assessment saved successfully!');
       Alert.alert('Saved! 🎉', 'Your memory assessment has been saved!');
     } catch (error) {
       console.error('[MemoryAssessment] Error saving assessment:', error);
@@ -199,12 +189,17 @@ const MemoryAssessmentScreen = ({ navigation }) => {
   };
 
   const startCameraValidation = () => {
+    if (permission?.status !== 'granted') {
+      Alert.alert('Camera Permission', 'Please grant camera permission to proceed.');
+      return;
+    }
     setIsValidating(true);
     setCurrentValidationStep(0);
     setValidationResults([]);
     setCompletedSteps(Array(commands.length).fill(false));
     setValidationScore(0);
     setDetectionStatus('waiting');
+    setIsCameraReady(true);
   };
 
   const handleValidationStepResult = (success) => {
@@ -490,15 +485,6 @@ const MemoryAssessmentScreen = ({ navigation }) => {
       <View style={styles.container}>
         <ResultModal />
 
-        {/* Always-mounted hidden video for frame capture */}
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          style={{ position: 'fixed', opacity: 0, pointerEvents: 'none', width: 1, height: 1, top: 0, left: 0 }}
-        />
-
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Icon name="arrow-back" size={24} color={Colors.darkGray} />
@@ -517,20 +503,24 @@ const MemoryAssessmentScreen = ({ navigation }) => {
                       <Text style={styles.cameraLoadingText}>Starting camera…</Text>
                     </View>
                   )}
-                  <video
-                    ref={visibleVideoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      borderRadius: 13,
-                      transform: 'scaleX(-1)',
-                      display: isCameraReady ? 'block' : 'none',
-                    }}
-                  />
+                  {permission?.granted ? (
+                    <CameraView
+                      ref={cameraRef}
+                      style={{ width: '100%', height: '100%' }}
+                      facing="front"
+                      onCameraReady={() => setIsCameraReady(true)}
+                    />
+                  ) : (
+                    <View style={{ justifyContent: 'center', alignItems: 'center', flex: 1 }}>
+                      <Text style={styles.cameraLoadingText}>Camera permission needed</Text>
+                      <TouchableOpacity 
+                        style={{ marginTop: 16, padding: 12, backgroundColor: Colors.primaryBlue, borderRadius: 8 }}
+                        onPress={requestPermission}
+                      >
+                        <Text style={{ color: 'white', fontFamily: fonts.bold }}>Grant Permission</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
 
                 <View style={styles.detectionIndicator}>

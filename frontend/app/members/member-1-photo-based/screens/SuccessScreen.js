@@ -1,3 +1,4 @@
+// SuccessScreen — shown when the child spells correctly; plays speech, animates stars, and drops confetti
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Dimensions, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +11,12 @@ import * as Speech from 'expo-speech';
 
 const { width, height } = Dimensions.get('window');
 
+// Props:
+//   challengeMode        — true if the child is in the daily challenge
+//   completedCount       — how many challenge words are done so far
+//   totalCount           — total words in today's challenge
+//   isFinalChallengeWord — true when this was the last word in the challenge
+//   nextWord             — the upcoming challenge word (shown as a preview)
 const SuccessScreen = ({
     onContinue,
     onHome,
@@ -19,58 +26,48 @@ const SuccessScreen = ({
     isFinalChallengeWord = false,
     nextWord = null,
 }) => {
-    const scaleAnim = useRef(new Animated.Value(0)).current;
-    const starAnims = useRef([
+    // Animations
+    const scaleAnim = useRef(new Animated.Value(0)).current;  // mascot pops in from scale 0
+    const starAnims = useRef([                                  // 3 stars pop in with a stagger delay
         new Animated.Value(0),
         new Animated.Value(0),
         new Animated.Value(0),
     ]).current;
-    const confettiAnims = useRef(
+    const confettiAnims = useRef(                              // 15 confetti pieces fall from top to bottom
         Array(15).fill(0).map(() => ({
             y: new Animated.Value(-50),
-            x: Math.random() * width,
+            x: Math.random() * width,        // random horizontal position
             rotation: new Animated.Value(0),
         }))
     ).current;
+
+    // Dynamic text — changes based on whether it's challenge mode or free practice, and final word or not
     const title = challengeMode
         ? (isFinalChallengeWord ? 'Challenge Complete!' : 'Word Complete!')
         : 'Great Job!';
     const subtitle = challengeMode
-        ? (
-            isFinalChallengeWord
-                ? `You finished all ${totalCount} words for today!`
-                : `You completed ${completedCount} of ${totalCount} words.`
-        )
+        ? (isFinalChallengeWord
+            ? `You finished all ${totalCount} words for today!`
+            : `You completed ${completedCount} of ${totalCount} words.`)
         : 'You spelled it correctly! 🎊';
     const highlightText = challengeMode
-        ? (
-            isFinalChallengeWord
-                ? `All ${totalCount} challenge words are done`
-                : `Next word: ${nextWord}`
-        )
+        ? (isFinalChallengeWord ? `All ${totalCount} challenge words are done` : `Next word: ${nextWord}`)
         : '+10 points';
     const bottomMessage = challengeMode
-        ? (
-            isFinalChallengeWord
-                ? 'Come back tomorrow for a new set of words.'
-                : 'Ready for the next photo challenge?'
-        )
+        ? (isFinalChallengeWord ? 'Come back tomorrow for a new set of words.' : 'Ready for the next photo challenge?')
         : "You're becoming a spelling star! ⭐";
     const continueLabel = challengeMode
         ? (isFinalChallengeWord ? 'Back to Challenges' : 'Next Word')
         : 'Continue 🚀';
 
     useEffect(() => {
+        // Speak a congratulatory message when the screen mounts
         const speechMessage = challengeMode
-            ? (
-                isFinalChallengeWord
-                    ? 'Amazing work! You finished today challenge.'
-                    : 'Great job! Let us do the next word.'
-            )
+            ? (isFinalChallengeWord ? 'Amazing work! You finished today challenge.' : 'Great job! Let us do the next word.')
             : 'Great job! You spelled it correctly!';
-
         Speech.speak(speechMessage, { language: 'en' });
 
+        // Mascot pops in with a spring animation
         Animated.spring(scaleAnim, {
             toValue: 1,
             tension: 50,
@@ -78,6 +75,7 @@ const SuccessScreen = ({
             useNativeDriver: true,
         }).start();
 
+        // Stars pop in one by one, each delayed by 100ms after the previous
         starAnims.forEach((anim, index) => {
             Animated.spring(anim, {
                 toValue: 1,
@@ -88,6 +86,7 @@ const SuccessScreen = ({
             }).start();
         });
 
+        // Confetti pieces fall from top (-50) to bottom (height + 50) in a looping animation
         confettiAnims.forEach((confetti) => {
             Animated.loop(
                 Animated.parallel([
@@ -116,7 +115,7 @@ const SuccessScreen = ({
             end={{ x: 1, y: 1 }}
             style={styles.container}
         >
-            {/* Confetti */}
+            {/* Confetti overlay — 15 small squares falling down the screen */}
             {confettiAnims.map((confetti, index) => (
                 <Animated.View
                     key={index}
@@ -140,49 +139,34 @@ const SuccessScreen = ({
             ))}
 
             <SafeAreaView style={styles.safeArea}>
-                {/* Home Button */}
+                {/* Home button */}
                 <TouchableOpacity style={styles.homeButton} onPress={onHome}>
                     <Home size={24} color="#059669" />
                 </TouchableOpacity>
 
-                <ScrollView
-                    contentContainerStyle={styles.scrollContent}
-                    showsVerticalScrollIndicator={false}
-                >
-                    <Animated.View style={[
-                        styles.mascotContainer,
-                        { transform: [{ scale: scaleAnim }] }
-                    ]}>
+                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                    {/* Mascot springs in from scale 0 */}
+                    <Animated.View style={[styles.mascotContainer, { transform: [{ scale: scaleAnim }] }]}>
                         <Mascot mood="excited" size="medium" />
                     </Animated.View>
 
+                    {/* Main card: title, subtitle, 3 animated stars, points/next-word box */}
                     <View style={styles.card}>
                         <Text style={styles.celebrationEmoji}>🎉</Text>
 
-                        <Text style={[styles.title, { fontFamily: fonts.bold }]}>
-                            {title}
-                        </Text>
+                        <Text style={[styles.title, { fontFamily: fonts.bold }]}>{title}</Text>
+                        <Text style={[styles.subtitle, { fontFamily: fonts.regular }]}>{subtitle}</Text>
 
-                        <Text style={[styles.subtitle, { fontFamily: fonts.regular }]}>
-                            {subtitle}
-                        </Text>
-
+                        {/* Three stars that pop in with a spring one after the other */}
                         <View style={styles.starsRow}>
                             {starAnims.map((anim, index) => (
-                                <Animated.View
-                                    key={index}
-                                    style={{ transform: [{ scale: anim }] }}
-                                >
-                                    <Star
-                                        size={44}
-                                        color={colors.yellow}
-                                        fill={colors.yellow}
-                                        style={styles.star}
-                                    />
+                                <Animated.View key={index} style={{ transform: [{ scale: anim }] }}>
+                                    <Star size={44} color={colors.yellow} fill={colors.yellow} style={styles.star} />
                                 </Animated.View>
                             ))}
                         </View>
 
+                        {/* Shows "+10 points" in free practice, or next challenge word preview */}
                         <View style={styles.pointsBox}>
                             <Text style={[styles.pointsText, { fontFamily: fonts.bold }]}>
                                 {challengeMode ? 'Keep going: ' : 'You earned '}
@@ -192,20 +176,15 @@ const SuccessScreen = ({
                         </View>
                     </View>
 
+                    {/* Continue button — label changes based on context (Next Word / Back to Challenges / Continue) */}
                     <View style={styles.buttonContainer}>
-                        <RoundedButton
-                            variant="primary"
-                            size="large"
-                            onPress={onContinue}
-                        >
+                        <RoundedButton variant="primary" size="large" onPress={onContinue}>
                             {continueLabel}
                         </RoundedButton>
                     </View>
 
                     <View style={styles.messageBox}>
-                        <Text style={[styles.messageText, { fontFamily: fonts.bold }]}>
-                            {bottomMessage}
-                        </Text>
+                        <Text style={[styles.messageText, { fontFamily: fonts.bold }]}>{bottomMessage}</Text>
                     </View>
                 </ScrollView>
             </SafeAreaView>

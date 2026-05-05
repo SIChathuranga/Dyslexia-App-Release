@@ -1,0 +1,49 @@
+Looking in indexes: https://pypi.org/simple, https://download.pytorch.org/whl/cpu
+Collecting numpy<2 (from -r requirements.txt (line 1))
+  Using cached numpy-1.26.4.tar.gz (15.8 MB)
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Getting requirements to build wheel: finished with status 'done'
+  Installing backend dependencies: started
+  Installing backend dependencies: finished with status 'done'
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'error'
+  error: subprocess-exited-with-error
+  
+  Preparing metadata (pyproject.toml) did not run successfully.
+  exit code: 1
+  
+  [21 lines of output]
+  + d:\SLIIT LIFE\Research\Dyslexia App Release\Dyslexia App Release\backend\MS-Photo-based spelling, CV, STT, NLP, multisensory feedback\.venv\Scripts\python.exe C:\Users\sicha\AppData\Local\Temp\pip-install-edj_rahb\numpy_4d45d7f5358146a3959be42ab1014cbf\vendored-meson\meson\meson.py setup C:\Users\sicha\AppData\Local\Temp\pip-install-edj_rahb\numpy_4d45d7f5358146a3959be42ab1014cbf C:\Users\sicha\AppData\Local\Temp\pip-install-edj_rahb\numpy_4d45d7f5358146a3959be42ab1014cbf\.mesonpy-o8gz_kyv -Dbuildtype=release -Db_ndebug=if-release -Db_vscrt=md --native-file=C:\Users\sicha\AppData\Local\Temp\pip-install-edj_rahb\numpy_4d45d7f5358146a3959be42ab1014cbf\.mesonpy-o8gz_kyv\meson-python-native-file.ini
+  The Meson build system
+  Version: 1.2.99
+  Source dir: C:\Users\sicha\AppData\Local\Temp\pip-install-edj_rahb\numpy_4d45d7f5358146a3959be42ab1014cbf
+  Build dir: C:\Users\sicha\AppData\Local\Temp\pip-install-edj_rahb\numpy_4d45d7f5358146a3959be42ab1014cbf\.mesonpy-o8gz_kyv
+  Build type: native build
+  Project name: NumPy
+  Project version: 1.26.4
+  WARNING: Failed to activate VS environment: Could not parse vswhere.exe output
+  
+  ..\meson.build:1:0: ERROR: Unknown compiler(s): [['icl'], ['cl'], ['cc'], ['gcc'], ['clang'], ['clang-cl'], ['pgcc']]
+  The following exception(s) were encountered:
+  Running `icl ""` gave "[WinError 2] The system cannot find the file specified"
+  Running `cl /?` gave "[WinError 2] The system cannot find the file specified"
+  Running `cc --version` gave "[WinError 2] The system cannot find the file specified"
+  Running `gcc --version` gave "[WinError 2] The system cannot find the file specified"
+  Running `clang --version` gave "[WinError 2] The system cannot find the file specified"
+  Running `clang-cl /?` gave "[WinError 2] The system cannot find the file specified"
+  Running `pgcc --version` gave "[WinError 2] The system cannot find the file specified"
+  
+  A full log can be found at C:\Users\sicha\AppData\Local\Temp\pip-install-edj_rahb\numpy_4d45d7f5358146a3959be42ab1014cbf\.mesonpy-o8gz_kyv\meson-logs\meson-log.txt
+  [end of output]
+  
+  note: This error originates from a subprocess, and is likely not a problem with pip.
+error: metadata-generation-failed
+
+Encountered error while generating package metadata.
+
+numpy
+
+note: This is an issue with the package mentioned above, not pip.
+hint: See above for details.

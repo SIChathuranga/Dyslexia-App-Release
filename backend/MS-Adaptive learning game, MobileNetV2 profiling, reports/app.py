@@ -21,10 +21,13 @@ from flask_cors import CORS
 from pymongo import MongoClient
 from dotenv import load_dotenv
 import joblib, json, numpy as np, pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 import os, traceback, logging
 import threading
 import urllib.request
+import hashlib
+import secrets
+from bson import ObjectId
 
 load_dotenv()
 
@@ -49,7 +52,7 @@ else:
 MODEL_PATH   = os.getenv("MODEL_PATH",   "dyslexia_stage_model.pkl")
 SCALER_PATH  = os.getenv("SCALER_PATH",  "feature_scaler.pkl")
 FEAT_PATH    = os.getenv("FEAT_PATH",    "feature_cols.json")
-MONGO_URI    = os.getenv("MONGO_URI",    "mongodb://localhost:27017/")
+MONGO_URI    = os.getenv("MONGO_URI",    "mongodb+srv://admin:admin123@cluster0.rrncj4n.mongodb.net/")
 DB_NAME      = os.getenv("DB_NAME",      "dyslexia")
 
 # Collection prefix for this backend (Section 3: Multi-Skill Learning Game)
@@ -178,6 +181,68 @@ def load_user_sessions(user_id: str) -> list:
     return rows
 
 
+
+# ── Auth Utilities ───────────────────────────────────────────────
+PBKDF2_ITERATIONS = 210_000
+SESSION_TTL_DAYS = 30
+
+def hash_password(password: str, salt_hex: str = None) -> tuple:
+    salt = bytes.fromhex(salt_hex) if salt_hex else os.urandom(16)
+    digest = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt,
+        PBKDF2_ITERATIONS,
+    )
+    return salt.hex(), digest.hex()
+
+def verify_password(password: str, salt_hex: str, hash_hex: str) -> bool:
+    _, candidate = hash_password(password, salt_hex)
+    return secrets.compare_digest(candidate, hash_hex)
+
+def create_session(user_id: ObjectId) -> tuple:
+    _, col = get_db()
+    sessions_col = db[f"{COLLECTION_PREFIX}sessions"]
+    token = secrets.token_urlsafe(48)
+    expires_at = datetime.utcnow() + timedelta(days=SESSION_TTL_DAYS)
+    
+    sessions_col.insert_one({
+        "user_id": user_id,
+        "token": token,
+        "created_at": datetime.utcnow(),
+        "expires_at": expires_at
+    })
+    return token, expires_at
+
+def get_auth_user():
+    """Helper to get user from Bearer token in header."""
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return None
+    
+    token = auth_header.split(" ")[1]
+    _, _ = get_db()
+    sessions_col = db[f"{COLLECTION_PREFIX}sessions"]
+    users_col = db[f"{COLLECTION_PREFIX}users"]
+    
+    session = sessions_col.find_one({"token": token})
+    if not session:
+        return None
+    
+    if session.get("expires_at") and session["expires_at"] < datetime.utcnow():
+        sessions_col.delete_one({"_id": session["_id"]})
+        return None
+        
+    return users_col.find_one({"_id": session["user_id"]})
+
+def serialize_user(user):
+    return {
+        "id": str(user["_id"]),
+        "username": user.get("username"),
+        "email": user.get("email"),
+        "name": user.get("name")
+    }
+
 # ── ML helpers ───────────────────────────────────────────────────
 def predict_from_features(feat_dict: dict) -> dict:
     """Run model inference on a feature dict."""
@@ -287,8 +352,100 @@ def root():
             "progress": "GET /progress/<user_id>",
             "history": "GET /history/<user_id>",
             "users": "GET /users",
+            "auth_register": "POST /auth/register",
+            "auth_login": "POST /auth/login",
+            "auth_me": "GET /auth/me"
         }
     })
+
+
+@app.route("/auth/register", methods=["POST"])
+def register():
+    """Register a new user."""
+    try:
+        data = request.json
+        if not data or not data.get("email") or not data.get("password"):
+            return jsonify({"error": "Email and password are required"}), 400
+        
+        email = data["email"].strip().lower()
+        password = data["password"]
+        name = data.get("name", "").strip()
+        username = data.get("username", email.split("@")[0]).strip()
+        
+        _, _ = get_db()
+        users_col = db[f"{COLLECTION_PREFIX}users"]
+        
+        if users_col.find_one({"email": email}):
+            return jsonify({"error": "Email already registered"}), 409
+            
+        salt_hex, hash_hex = hash_password(password)
+        
+        user_doc = {
+            "email": email,
+            "username": username,
+            "name": name,
+            "password_salt": salt_hex,
+            "password_hash": hash_hex,
+            "created_at": datetime.utcnow()
+        }
+        
+        result = users_col.insert_one(user_doc)
+        user_id = result.inserted_id
+        
+        token, expires_at = create_session(user_id)
+        
+        return jsonify({
+            "token": token,
+            "expiresAt": expires_at.isoformat(),
+            "user": serialize_user(user_doc)
+        }), 201
+        
+    except Exception as e:
+        logger.error(f"Registration error: {traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/auth/login", methods=["POST"])
+def login():
+    """Login an existing user."""
+    try:
+        data = request.json
+        if not data or not data.get("email") or not data.get("password"):
+            return jsonify({"error": "Email and password are required"}), 400
+        
+        email = data["email"].strip().lower()
+        password = data["password"]
+        
+        _, _ = get_db()
+        users_col = db[f"{COLLECTION_PREFIX}users"]
+        
+        user = users_col.find_one({"email": email})
+        if not user:
+            return jsonify({"error": "Invalid email or password"}), 401
+            
+        if not verify_password(password, user["password_salt"], user["password_hash"]):
+            return jsonify({"error": "Invalid email or password"}), 401
+            
+        token, expires_at = create_session(user["_id"])
+        
+        return jsonify({
+            "token": token,
+            "expiresAt": expires_at.isoformat(),
+            "user": serialize_user(user)
+        })
+        
+    except Exception as e:
+        logger.error(f"Login error: {traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/auth/me", methods=["GET"])
+def get_me():
+    """Get current user details."""
+    user = get_auth_user()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+    return jsonify({"user": serialize_user(user)})
 
 
 @app.route("/health", methods=["GET"])

@@ -155,7 +155,7 @@ const API_BACKENDS = {
 
   /**
    * Actions / Cognitive Assessment Backend
-   * Handles: action detection inference for memory + instruction assessments
+   * Handles: action detection inference, assessment history tracking
    */
   actions: {
     name: 'Actions / Cognitive Assessment',
@@ -164,6 +164,8 @@ const API_BACKENDS = {
     endpoints: {
       predict: '/predict',
       health: '/health',
+      assessmentHistorySave: '/assessment-history/save',
+      assessmentHistoryList: '/assessment-history/list',
     },
   },
 };
@@ -189,14 +191,22 @@ const getBackendUrl = (backendKey) => {
   }
 
   // Check for environment variable override (Render deployment)
-  const envUrl = process.env[backend.envKey];
-  if (envUrl) {
-    return envUrl.replace(/\/+$/, ''); // strip trailing slash
+  // In Expo, EXPO_PUBLIC_* variables are embedded at build time
+  try {
+    const envUrl = process.env[backend.envKey];
+    if (envUrl && envUrl.length > 0) {
+      console.log(`[API] Using backend URL from env for ${backendKey}: ${envUrl}`);
+      return envUrl.replace(/\/+$/, ''); // strip trailing slash
+    }
+  } catch (e) {
+    console.warn(`[API] Could not access environment variable ${backend.envKey}:`, e.message);
   }
 
   // Fall back to local development URL
   const host = resolveDevHost();
-  return `http://${host}:${backend.defaultPort}`;
+  const fallbackUrl = `http://${host}:${backend.defaultPort}`;
+  console.log(`[API] Using fallback URL for ${backendKey}: ${fallbackUrl}`);
+  return fallbackUrl;
 };
 
 /**

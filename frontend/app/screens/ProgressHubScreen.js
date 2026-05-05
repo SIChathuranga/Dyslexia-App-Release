@@ -28,6 +28,7 @@ const ProgressHubScreen = ({ navigation }) => {
       subtitle: 'See spelling progress and accuracy',
       icon: Camera,
       iconBg: '#DCFCE7',
+      backendKey: 'photoSpelling',
       action: () =>
         navigation.navigate('PhotoSpellingModule', {
           directScreen: 'progress',
@@ -40,6 +41,7 @@ const ProgressHubScreen = ({ navigation }) => {
       subtitle: 'View learning insights and reports',
       icon: PenTool,
       iconBg: '#E0E7FF',
+      backendKey: 'writingMath',
       action: () => navigation.navigate('WritingMathModule', { screen: 'ProgressDashboard' }),
     },
     {
@@ -48,6 +50,7 @@ const ProgressHubScreen = ({ navigation }) => {
       subtitle: 'Check diagnosis and progress trend',
       icon: Gamepad2,
       iconBg: '#FEF3C7',
+      backendKey: 'multiSkill',
       action: () => navigation.navigate('MultiSkillModule', { screen: 'MultiSkillProgress' }),
     },
     {

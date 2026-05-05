@@ -5,7 +5,14 @@ const resolveBaseUrl = () => {
     return getBackendUrl('photoSpelling');
 };
 
+const resolveActionsBaseUrl = () => {
+    return getBackendUrl('actions');
+};
+
 const BASE_URL = resolveBaseUrl();
+const ACTIONS_BASE_URL = resolveActionsBaseUrl();
+
+console.log('[API] Initializing API clients:', { BASE_URL, ACTIONS_BASE_URL });
 
 const api = axios.create({
     baseURL: BASE_URL,
@@ -22,6 +29,16 @@ const jsonApi = axios.create({
     },
     timeout: 120000,
 });
+
+const actionsApi = axios.create({
+    baseURL: ACTIONS_BASE_URL,
+    headers: {
+        'Content-Type': 'application/json',
+    },
+    timeout: 120000,
+});
+
+console.log('[API] actionsApi created:', { baseURL: actionsApi.defaults.baseURL });
 
 /**
  * Check if an error is retryable (network, timeout, or 503 from cold start).
@@ -43,12 +60,18 @@ const applyAuthHeader = (config) => {
     if (authToken) {
         config.headers = config.headers || {};
         config.headers.Authorization = `Bearer ${authToken}`;
+        console.log('[API] Auth header applied:', { token: `${authToken.substring(0, 20)}...` });
+    } else {
+        console.warn('[API] No auth token set!');
     }
     return config;
 };
 
 api.interceptors.request.use(applyAuthHeader);
 jsonApi.interceptors.request.use(applyAuthHeader);
+actionsApi.interceptors.request.use(applyAuthHeader);
+
+console.log('[API] Interceptors attached to all axios instances');
 
 export const setAuthToken = (token) => {
     authToken = token || null;
@@ -156,15 +179,69 @@ export const getProgressStatsRemote = async () => {
 
 // ---------------- Assessment History ----------------
 export const saveAssessmentHistoryRemote = async (payload) => {
-    ensureOnline();
-    const response = await jsonApi.post('/assessment-history/save', payload);
-    return response.data;
+    try {
+        ensureOnline();
+        console.log('[API:saveAssessment] Request Start', {
+            endpoint: '/assessment-history/save',
+            baseURL: ACTIONS_BASE_URL,
+            payload,
+            hasAuthToken: !!authToken,
+        });
+        
+        const response = await actionsApi.post('/assessment-history/save', payload);
+        
+        console.log('[API:saveAssessment] Response Success', {
+            endpoint: '/assessment-history/save',
+            status: response.status,
+            data: response.data,
+        });
+        return response.data;
+    } catch (error) {
+        console.error('[API:saveAssessment] Request Failed', {
+            endpoint: '/assessment-history/save',
+            baseURL: ACTIONS_BASE_URL,
+            payload,
+            status: error.response?.status,
+            statusText: error.response?.statusText,
+            errorData: error.response?.data,
+            message: error.message,
+            code: error.code,
+        });
+        throw error;
+    }
 };
 
 export const fetchAssessmentHistoryRemote = async (payload) => {
-    ensureOnline();
-    const response = await jsonApi.post('/assessment-history/list', payload);
-    return response.data;
+    try {
+        ensureOnline();
+        console.log('[API:fetchAssessment] Request Start', {
+            endpoint: '/assessment-history/list',
+            baseURL: ACTIONS_BASE_URL,
+            payload,
+            hasAuthToken: !!authToken,
+        });
+        
+        const response = await actionsApi.post('/assessment-history/list', payload);
+        
+        console.log('[API:fetchAssessment] Response Success', {
+            endpoint: '/assessment-history/list',
+            status: response.status,
+            assessmentsCount: response.data?.assessments?.length || 0,
+        });
+        return response.data;
+    } catch (error) {
+        console.error('[API:fetchAssessment] Request Failed', {
+            endpoint: '/assessment-history/list',
+            baseURL: ACTIONS_BASE_URL,
+            payload,
+            status: error.response?.status,
+            statusText: error.response?.statusText,
+            errorData: error.response?.data,
+            message: error.message,
+            code: error.code,
+        });
+        throw error;
+    }
 };
 
 export const transcribeAudio = async (audioUri, _retries = 3) => {

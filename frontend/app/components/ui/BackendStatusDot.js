@@ -38,17 +38,31 @@ const BackendStatusDot = ({ backendKey, label = false, style }) => {
   const ping = async () => {
     try {
       const baseUrl = getBackendUrl(backendKey);
+      
+      // Skip status check for actions backend (no /health endpoint, tested via actual API calls)
+      if (backendKey === 'actions') {
+        console.log(`[BackendStatusDot] ${backendKey} - skipping health check (tested via API calls)`);
+        setStatus(STATUS.ONLINE);
+        return;
+      }
+      
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 90000); // 90s — covers HF Spaces cold start
 
-      const res = await fetch(baseUrl, {
+      const pingUrl = `${baseUrl}/`;
+      
+      console.log(`[BackendStatusDot] Pinging ${backendKey}:`, pingUrl);
+
+      const res = await fetch(pingUrl, {
         method: 'GET',
         signal: controller.signal,
       });
       clearTimeout(timeout);
 
+      console.log(`[BackendStatusDot] ${backendKey} response:`, res.status);
       setStatus(res.ok || res.status < 500 ? STATUS.ONLINE : STATUS.OFFLINE);
-    } catch {
+    } catch (error) {
+      console.error(`[BackendStatusDot] ${backendKey} error:`, error.message);
       setStatus(STATUS.OFFLINE);
     }
   };

@@ -182,7 +182,7 @@ const ModuleCard = ({ mod, onPress, enterDelay }) => {
 };
 
 // ── Main screen ───────────────────────────────────────────────────────────────
-const MainHomeScreen = ({ navigation }) => {
+const MainHomeScreen = ({ navigation, user }) => {
   // Owl wink animation (alternating eyes)
   const owlBounce = useRef(new Animated.Value(0)).current;
   const headerFade = useRef(new Animated.Value(0)).current;
@@ -232,7 +232,9 @@ const MainHomeScreen = ({ navigation }) => {
 
           {/* Greeting */}
           <View style={styles.headerText}>
-            <Text style={styles.headerHello}>Hello, Superstar! 🌟</Text>
+            <Text style={styles.headerHello}>
+              Hello, {user?.name || user?.username || 'Superstar'}! 🌟
+            </Text>
             <Text style={styles.headerSub}>What do you want to learn today?</Text>
           </View>
 

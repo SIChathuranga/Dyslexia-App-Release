@@ -40,6 +40,11 @@ import MemoryAssessmentScreen from './members/member-4-cognitive-assessment/scre
 import InstructionAssessmentScreen from './members/member-4-cognitive-assessment/screens/InstructionAssessmentScreen';
 import ActionsScreen from './members/member-4-cognitive-assessment/screens/ActionsScreen';
 import ActionsProgressScreen from './members/member-4-cognitive-assessment/screens/ActionsProgressScreen';
+import AssessmentHistoryScreen from './members/member-4-cognitive-assessment/screens/AssessmentHistoryScreen';
+import SignInScreen from './screens/SignInScreen';
+import SignUpScreen from './screens/SignUpScreen';
+import { getAuthSession, isSessionValid } from './services/authSession';
+import { setAuthToken } from './members/member-3-adaptive-learning-game/services/multiSkillApi';
 
 // Learning modules
 import PhotoSpellingModule from './members/member-1-photo-based/module/PhotoSpellingModule';
@@ -82,52 +87,6 @@ const getTabIcon = (routeName) => {
   }
 };
 
-const MainTabs = () => (
-  <Tab.Navigator
-    screenOptions={({ route }) => ({
-      headerShown: false,
-      tabBarActiveTintColor: colors.purple,
-      tabBarInactiveTintColor: '#94A3B8',
-      tabBarStyle: tabBarStyles,
-      tabBarLabelStyle: { fontSize: 11, fontFamily: 'OpenDyslexic-Bold' },
-      tabBarIcon: ({ color }) => {
-        const Icon = getTabIcon(route.name);
-        return <Icon size={22} color={color} />;
-      },
-    })}
-  >
-    <Tab.Screen
-      name="MainHome"
-      component={MainHomeScreen}
-      options={{ title: 'Home' }}
-    />
-    <Tab.Screen
-      name="PhotoSpellingModule"
-      component={PhotoSpellingModule}
-      options={{ title: 'Photo' }}
-    />
-    <Tab.Screen
-      name="WritingMathModule"
-      component={WritingMathModule}
-      options={{ title: 'Write' }}
-    />
-    <Tab.Screen
-      name="MultiSkillModule"
-      component={MultiSkillModule}
-      options={{ title: 'Games' }}
-    />
-    <Tab.Screen
-      name="Actions"
-      component={ActionsScreen}
-      options={{ title: 'Actions' }}
-    />
-    <Tab.Screen
-      name="Settings"
-      component={UnifiedSettingsScreen}
-      options={{ title: 'Settings' }}
-    />
-  </Tab.Navigator>
-);
 
 export default function App() {
   // Load all OpenDyslexic font variants
@@ -140,16 +99,93 @@ export default function App() {
 
   const [checkingWelcome, setCheckingWelcome] = useState(true);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [user, setUser] = useState(null);
+  const [initializing, setInitializing] = useState(true);
 
-  // Check AsyncStorage flag to determine if welcome screen should show
+  // Check for existing session and welcome status
   useEffect(() => {
-    WelcomeScreen.shouldShow().then((should) => {
-      setShowWelcome(should);
-      setCheckingWelcome(false);
-    });
+    const initialize = async () => {
+      try {
+        // Check welcome screen status
+        const shouldShowWelcome = await WelcomeScreen.shouldShow();
+        setShowWelcome(shouldShowWelcome);
+
+        // Check authentication session
+        const session = await getAuthSession();
+        if (session && isSessionValid(session)) {
+          setUser(session.user);
+          setAuthToken(session.token);
+        }
+      } catch (error) {
+        console.error('Initialization error:', error);
+      } finally {
+        setInitializing(false);
+        setCheckingWelcome(false);
+      }
+    };
+
+    initialize();
   }, []);
 
-  if (!fontsLoaded || checkingWelcome) {
+  const handleLoginSuccess = (userData) => {
+    setUser(userData);
+  };
+
+  const handleLogout = async () => {
+    setUser(null);
+    setAuthToken(null);
+  };
+
+  const MainTabs = ({ user }) => (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarActiveTintColor: colors.purple,
+        tabBarInactiveTintColor: '#94A3B8',
+        tabBarStyle: tabBarStyles,
+        tabBarLabelStyle: { fontSize: 11, fontFamily: 'OpenDyslexic-Bold' },
+        tabBarIcon: ({ color }) => {
+          const Icon = getTabIcon(route.name);
+          return <Icon size={22} color={color} />;
+        },
+      })}
+    >
+      <Tab.Screen
+        name="MainHome"
+        options={{ title: 'Home' }}
+      >
+        {(props) => <MainHomeScreen {...props} user={user} />}
+      </Tab.Screen>
+      <Tab.Screen
+        name="PhotoSpellingModule"
+        component={PhotoSpellingModule}
+        options={{ title: 'Photo' }}
+      />
+      <Tab.Screen
+        name="WritingMathModule"
+        component={WritingMathModule}
+        options={{ title: 'Write' }}
+      />
+      <Tab.Screen
+        name="MultiSkillModule"
+        component={MultiSkillModule}
+        options={{ title: 'Games' }}
+      />
+      <Tab.Screen
+        name="Actions"
+        component={ActionsScreen}
+        options={{ title: 'Actions' }}
+      />
+      <Tab.Screen
+        name="Settings"
+        options={{ title: 'Settings' }}
+      >
+        {(props) => <UnifiedSettingsScreen {...props} onLogout={handleLogout} />}
+      </Tab.Screen>
+    </Tab.Navigator>
+  );
+
+  if (!fontsLoaded || checkingWelcome || initializing) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.purple} />
@@ -158,11 +194,22 @@ export default function App() {
     );
   }
 
+  const AuthStack = () => (
+    <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      <Stack.Screen name="SignIn">
+        {(props) => <SignInScreen {...props} onLoginSuccess={handleLoginSuccess} />}
+      </Stack.Screen>
+      <Stack.Screen name="SignUp">
+        {(props) => <SignUpScreen {...props} onLoginSuccess={handleLoginSuccess} />}
+      </Stack.Screen>
+    </Stack.Navigator>
+  );
+
   return (
     <SafeAreaProvider>
       <NavigationContainer>
         <Stack.Navigator
-          initialRouteName={showWelcome ? 'Welcome' : 'MainTabs'}
+          initialRouteName={showWelcome ? 'Welcome' : (user ? 'MainTabs' : 'Auth')}
           screenOptions={{
             headerShown: false,
             animation: 'slide_from_right',
@@ -175,44 +222,53 @@ export default function App() {
           >
             {({ navigation }) => (
               <WelcomeScreen
-                onDone={() => navigation.replace('MainTabs')}
+                onDone={() => navigation.replace(user ? 'MainTabs' : 'Auth')}
               />
             )}
           </Stack.Screen>
 
-          {/* Main bottom navigation */}
-          <Stack.Screen
-            name="MainTabs"
-            component={MainTabs}
-            options={{ headerShown: false }}
-          />
 
-          {/* Progress hub */}
-          <Stack.Screen
-            name="ProgressHub"
-            component={ProgressHubScreen}
-            options={{ headerShown: false }}
-          />
-
-          {/* Memory Assessment */}
-          <Stack.Screen
-            name="MemoryAssessment"
-            component={MemoryAssessmentScreen}
-            options={{ headerShown: false }}
-          />
-
-          {/* Instruction Follow */}
-          <Stack.Screen
-            name="InstructionFollow"
-            component={InstructionAssessmentScreen}
-            options={{ headerShown: false }}
-          />
-
-          <Stack.Screen
-            name="ActionsProgress"
-            component={ActionsProgressScreen}
-            options={{ headerShown: false }}
-          />
+          {/* Main Content Stack */}
+          {user ? (
+            <>
+              <Stack.Screen
+                name="MainTabs"
+                options={{ headerShown: false }}
+              >
+                {(props) => <MainTabs {...props} user={user} />}
+              </Stack.Screen>
+              <Stack.Screen
+                name="ProgressHub"
+                component={ProgressHubScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="MemoryAssessment"
+                component={MemoryAssessmentScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="InstructionFollow"
+                component={InstructionAssessmentScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="ActionsProgress"
+                component={ActionsProgressScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="AssessmentHistory"
+                component={AssessmentHistoryScreen}
+                options={{ headerShown: false }}
+              />
+            </>
+          ) : (
+            <Stack.Screen
+              name="Auth"
+              component={AuthStack}
+            />
+          )}
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

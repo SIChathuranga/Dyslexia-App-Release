@@ -1,3 +1,4 @@
+// ErrorScreen — shown when the child's spelling attempt was wrong; gives a syllable hint and retry option
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,11 +11,17 @@ import { colors, fonts } from '../../../theme';
 import * as Speech from 'expo-speech';
 import { getSyllablesWithColors } from '../../../utils/syllableUtils';
 
+// Props:
+//   detectedObject — the object the child was trying to spell ({ label })
+//   onRetry        — go back to SpeakNowScreen to try again
+//   onHome         — exit back to home / exit challenge
 const ErrorScreen = ({ detectedObject, onRetry, onHome }) => {
     const { label = 'APPLE' } = detectedObject || {};
 
+    // Split word into colour-coded syllables e.g. "AP" "PLE" with different colours
     const phonemeHints = getSyllablesWithColors(label);
 
+    // Speak an encouraging message as soon as this screen appears
     React.useEffect(() => {
         Speech.speak("Almost there! Let's try again together.", { language: 'en' });
     }, []);
@@ -27,28 +34,29 @@ const ErrorScreen = ({ detectedObject, onRetry, onHome }) => {
             style={styles.container}
         >
             <SafeAreaView style={styles.safeArea}>
-                {/* Home Button */}
+                {/* Home button — absolute top-left */}
                 <TouchableOpacity style={styles.homeButton} onPress={onHome}>
                     <Home size={24} color="#C2410C" />
                 </TouchableOpacity>
 
                 <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                    {/* Encouraging mascot */}
                     <View style={styles.mascotContainer}>
                         <Mascot mood="encouraging" size="medium" />
                     </View>
 
+                    {/* Message card */}
                     <View style={styles.messageCard}>
                         <Lightbulb size={48} color="#F59E0B" style={styles.lightbulb} />
-
                         <Text style={[styles.title, { fontFamily: fonts.bold }]}>
                             Almost there!
                         </Text>
-
                         <Text style={[styles.subtitle, { fontFamily: fonts.regular }]}>
                             Let's try again together. 💛
                         </Text>
                     </View>
 
+                    {/* Hint card — word broken into colour-coded syllables */}
                     <View style={styles.hintsCard}>
                         <View style={styles.hintsHeader}>
                             <View style={styles.hintIcon}>
@@ -63,6 +71,7 @@ const ErrorScreen = ({ detectedObject, onRetry, onHome }) => {
                             Remember these sounds:
                         </Text>
 
+                        {/* Each PhonemeSegment is one syllable with a unique background colour */}
                         <View style={styles.phonemeRow}>
                             {phonemeHints.map((phoneme, index) => (
                                 <React.Fragment key={index}>
@@ -85,6 +94,7 @@ const ErrorScreen = ({ detectedObject, onRetry, onHome }) => {
                         </View>
                     </View>
 
+                    {/* Retry button — navigates back to SpeakNowScreen */}
                     <View style={styles.buttonContainer}>
                         <RoundedButton
                             variant="gentle"

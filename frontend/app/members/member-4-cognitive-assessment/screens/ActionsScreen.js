@@ -27,12 +27,20 @@ const ACTION_ITEMS = [
   },
   {
     id: 'actionsProgress',
-    title: 'Progress Dashboard',
+    title: 'Progress',
     subtitle: 'Track scores, trends, and recent attempts',
     emoji: '📊',
     route: 'ActionsProgress',
     gradientColors: ['#F3E8FF', '#FCE7F3'],
   },
+  // {
+  //   id: 'assessmentHistory',
+  //   title: 'Assessment History',
+  //   subtitle: 'Review past performance and metrics',
+  //   emoji: '📋',
+  //   route: 'AssessmentHistory',
+  //   gradientColors: ['#FCA5A5', '#FDBA74'],
+  // },
 ];
 
 const TinyOwl = ({ size = 48 }) => (

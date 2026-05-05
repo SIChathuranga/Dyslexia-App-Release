@@ -23,7 +23,7 @@ load_dotenv(os.path.join(_backend_dir, '.env'))
 logger = logging.getLogger(__name__)
 
 # ============================================================================
-# SINGLETON CONNECTION
+
 # ============================================================================
 
 _client = None
